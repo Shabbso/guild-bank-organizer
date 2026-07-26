@@ -156,8 +156,8 @@ testing.
 
 ## Source and support
 
-- Source: https://github.com/EricSlabsy/guild-bank-organizer
-- Issues: https://github.com/EricSlabsy/guild-bank-organizer/issues
+- Source: https://github.com/Shabbso/guild-bank-organizer
+- Issues: https://github.com/Shabbso/guild-bank-organizer/issues
 
 The source is publicly viewable for transparency and issue reporting. Public
 availability does not grant permission to copy, modify, redistribute, or
