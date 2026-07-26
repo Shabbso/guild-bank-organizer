@@ -1,0 +1,347 @@
+local _, GBO = ...
+
+local itemClass = Enum and Enum.ItemClass or {}
+local CLASS = {
+    CONSUMABLE = itemClass.Consumable or 0,
+    CONTAINER = itemClass.Container or 1,
+    WEAPON = itemClass.Weapon or 2,
+    GEM = itemClass.Gem or 3,
+    ARMOR = itemClass.Armor or 4,
+    TRADEGOODS = itemClass.Tradegoods or 7,
+    ITEM_ENHANCEMENT = itemClass.ItemEnhancement or 8,
+    MISCELLANEOUS = itemClass.Miscellaneous or 15,
+    GLYPH = itemClass.Glyph or 16,
+    BATTLE_PET = itemClass.Battlepet or 17,
+}
+
+local TRADEGOODS = {
+    JEWELCRAFTING = 4,
+    CLOTH = 5,
+    LEATHER = 6,
+    METAL_AND_STONE = 7,
+    COOKING = 8,
+    HERB = 9,
+    ELEMENTAL = 10,
+    ENCHANTING = 12,
+    INSCRIPTION = 16,
+}
+
+local CONSUMABLE = {
+    POTION = 1,
+    ELIXIR = 2,
+    FLASK = 3,
+    FOOD_AND_DRINK = 5,
+}
+
+-- Lockboxes do not have a dependable lockbox-only class/subclass in this
+-- client. Keep the built-in list explicit so the rule is inspectable and can
+-- be supplemented by per-tab exact item IDs.
+local LOCKBOX_ITEM_IDS = {
+    [4632] = true, [4633] = true, [4634] = true, [4636] = true,
+    [5758] = true, [5759] = true, [5760] = true,
+    [6354] = true, [6355] = true, [13875] = true, [16882] = true,
+    [29569] = true, [31952] = true, [43622] = true, [43624] = true,
+    [45986] = true, [68729] = true, [88567] = true,
+}
+
+-- A small number of Classic items have gameplay categories that do not match
+-- the class/subclass exposed by the item API. Keep these exceptions explicit
+-- and reviewable instead of weakening the broad public category rules.
+--
+-- false means "do not route through a broad category." Exact item-ID profile
+-- rules can still opt such an item in, although soulbound items remain blocked.
+local CATEGORY_ITEM_OVERRIDES = {
+    [83064] = "fish", -- Spinefish: Alchemy reagent obtained through fishing
+    [103641] = false, -- Singing Crystal: soulbound Timeless Isle combat buff
+}
+
+local function classIs(classID)
+    return function(item)
+        return item.classID == classID
+    end
+end
+
+local function tradegoodsIs(subclassID)
+    return function(item)
+        return item.classID == CLASS.TRADEGOODS
+            and item.subclassID == subclassID
+    end
+end
+
+local categories = {
+    {
+        key = "trinkets",
+        name = "Trinkets",
+        description = "Items equipped in a trinket slot.",
+        evidence = "Equipment slot",
+        matches = function(item)
+            return item.equipLoc == "INVTYPE_TRINKET"
+        end,
+    },
+    {
+        key = "armor",
+        name = "Armor",
+        description = "Wearable armor. Cloth material and bags are excluded.",
+        evidence = "Item class",
+        matches = classIs(CLASS.ARMOR),
+    },
+    {
+        key = "weapons",
+        name = "Weapons",
+        description = "All weapon classes and weapon types.",
+        evidence = "Item class",
+        matches = classIs(CLASS.WEAPON),
+    },
+    {
+        key = "elemental",
+        name = "Elemental",
+        description = "Motes, primals, crystallized, eternal, volatile, and spirit materials.",
+        evidence = "Trade Goods subclass",
+        matches = tradegoodsIs(TRADEGOODS.ELEMENTAL),
+    },
+    {
+        key = "battle_pets",
+        name = "Battle Pets",
+        description = "Caged battle pets and legacy companion-pet items.",
+        evidence = "Item class",
+        matches = function(item)
+            return item.classID == CLASS.BATTLE_PET
+                or item.classID == CLASS.MISCELLANEOUS
+                    and item.subclassID == 2
+        end,
+    },
+    {
+        key = "lockboxes",
+        name = "Lockboxes",
+        description = "Known locked containers. Add unusual ones by exact item ID.",
+        evidence = "Curated item IDs",
+        matches = function(item)
+            return LOCKBOX_ITEM_IDS[item.itemID] == true
+        end,
+    },
+    {
+        key = "bags",
+        name = "Bags",
+        description = "Equippable bags and containers; known lockboxes are excluded.",
+        evidence = "Item class",
+        matches = classIs(CLASS.CONTAINER),
+    },
+    {
+        key = "cloth",
+        name = "Cloth",
+        description = "Raw cloth and bolts from every expansion, not cloth armor.",
+        evidence = "Trade Goods subclass",
+        matches = tradegoodsIs(TRADEGOODS.CLOTH),
+    },
+    {
+        key = "enchanting",
+        name = "Enchanting",
+        description = "Dust, essence, shards, crystals, and item enchantments.",
+        evidence = "Trade Goods or enhancement class",
+        matches = function(item)
+            return item.classID == CLASS.TRADEGOODS
+                    and item.subclassID == TRADEGOODS.ENCHANTING
+                or item.classID == CLASS.ITEM_ENHANCEMENT
+        end,
+    },
+    {
+        key = "food",
+        name = "Food",
+        description = "Finished food and drink consumables.",
+        evidence = "Consumable subclass",
+        matches = function(item)
+            return item.classID == CLASS.CONSUMABLE
+                and item.subclassID == CONSUMABLE.FOOD_AND_DRINK
+        end,
+    },
+    {
+        key = "fish",
+        name = "Fish & Raw Cooking",
+        description = "Raw fish, meat, and cooking ingredients grouped together by the game.",
+        evidence = "Trade Goods subclass",
+        matches = tradegoodsIs(TRADEGOODS.COOKING),
+    },
+    {
+        key = "herbs",
+        name = "Herbs",
+        description = "Herbs from every expansion.",
+        evidence = "Trade Goods subclass",
+        matches = tradegoodsIs(TRADEGOODS.HERB),
+    },
+    {
+        key = "alchemy",
+        name = "Alchemy",
+        description = "Potions, elixirs, and flasks. Herbs remain in Herbs.",
+        evidence = "Consumable subclass",
+        matches = function(item)
+            return item.classID == CLASS.CONSUMABLE
+                and (
+                    item.subclassID == CONSUMABLE.POTION
+                    or item.subclassID == CONSUMABLE.ELIXIR
+                    or item.subclassID == CONSUMABLE.FLASK
+                )
+        end,
+    },
+    {
+        key = "jewels",
+        name = "Jewels",
+        description = "Cut and uncut gems plus Jewelcrafting trade goods.",
+        evidence = "Item or Trade Goods class",
+        matches = function(item)
+            return item.classID == CLASS.GEM
+                or item.classID == CLASS.TRADEGOODS
+                    and item.subclassID == TRADEGOODS.JEWELCRAFTING
+        end,
+    },
+    {
+        key = "ore",
+        name = "Ore, Bars & Stone",
+        description = "Ore, bars, and stone; the game stores these in one material subclass.",
+        evidence = "Trade Goods subclass",
+        matches = tradegoodsIs(TRADEGOODS.METAL_AND_STONE),
+    },
+    {
+        key = "blacksmithing",
+        name = "Blacksmithing (exact items)",
+        description = "Non-armor crafted items you add by item ID; profession origin is not universal metadata.",
+        evidence = "Exact item IDs",
+        matches = function()
+            return false
+        end,
+    },
+    {
+        key = "inscription",
+        name = "Inscription",
+        description = "Pigments, inks, and glyphs.",
+        evidence = "Trade Goods or Glyph class",
+        matches = function(item)
+            return item.classID == CLASS.GLYPH
+                or item.classID == CLASS.TRADEGOODS
+                    and item.subclassID == TRADEGOODS.INSCRIPTION
+        end,
+    },
+    {
+        key = "leather",
+        name = "Leather",
+        description = "Leather, hides, and related raw leatherworking materials.",
+        evidence = "Trade Goods subclass",
+        matches = tradegoodsIs(TRADEGOODS.LEATHER),
+    },
+}
+
+local categoryByKey = {}
+for _, category in ipairs(categories) do
+    categoryByKey[category.key] = category
+end
+
+local expansions = {
+    { id = 0, name = "Classic", shortName = "Classic" },
+    { id = 1, name = "The Burning Crusade", shortName = "TBC" },
+    { id = 2, name = "Wrath of the Lich King", shortName = "Wrath" },
+    { id = 3, name = "Cataclysm", shortName = "Cata" },
+    { id = 4, name = "Mists of Pandaria", shortName = "Mists" },
+}
+
+local expansionItemOverrides = {
+    -- MoP enchanting materials. Some Classic-client item-info cache states
+    -- omit expacID even though class/subclass data is already available.
+    [74247] = 4, -- Ethereal Shard
+    [74248] = 4, -- Sha Crystal
+    [74249] = 4, -- Spirit Dust
+    [74250] = 4, -- Mysterious Essence
+}
+
+function GBO:GetDepositCategoryCatalog()
+    return categories
+end
+
+function GBO:GetDepositCategoryName(key)
+    local category = categoryByKey[key]
+    return category and category.name or tostring(key)
+end
+
+function GBO:GetDepositCategory(key)
+    return categoryByKey[key]
+end
+
+function GBO:ClassifyDepositItem(item)
+    if not item then
+        return nil
+    end
+    local override = CATEGORY_ITEM_OVERRIDES[tonumber(item.itemID)]
+    if override ~= nil then
+        return override or nil, "curated item ID"
+    end
+    for _, category in ipairs(categories) do
+        if category.matches(item) then
+            return category.key, category.evidence
+        end
+    end
+    return nil
+end
+
+function GBO:IsUnclassifiedDepositMaterial(item)
+    if not item or item.categoryKey then
+        return false
+    end
+    return item.classID == CLASS.TRADEGOODS
+        or item.classID == CLASS.GEM
+        or item.classID == CLASS.ITEM_ENHANCEMENT
+        or item.classID == CLASS.GLYPH
+end
+
+function GBO:GetDepositExpansionCatalog()
+    return expansions
+end
+
+function GBO:GetDepositExpansionName(expansionID)
+    for _, expansion in ipairs(expansions) do
+        if expansion.id == expansionID then
+            return expansion.name
+        end
+    end
+    return "Expansion " .. tostring(expansionID or "?")
+end
+
+function GBO:ResolveDepositExpansion(
+    itemID,
+    apiExpansionID,
+    classID
+)
+    itemID = tonumber(itemID)
+    local override = expansionItemOverrides[itemID]
+    if override ~= nil then
+        return override, "curated item ID"
+    end
+
+    apiExpansionID = tonumber(apiExpansionID)
+    if apiExpansionID ~= nil and apiExpansionID > 0 then
+        return apiExpansionID, "item API"
+    end
+
+    -- On MoP Classic 5.5.4, C_Item.GetItemInfo can return expacID=0 for
+    -- post-Classic materials (for example Snow Lily Petal 97622). Use the
+    -- item-number era only for material-like classes; equipment keeps the API
+    -- value because expansion-era item numbers overlap near release borders.
+    local materialLike = classID == CLASS.CONSUMABLE
+        or classID == CLASS.CONTAINER
+        or classID == CLASS.GEM
+        or classID == CLASS.TRADEGOODS
+        or classID == CLASS.ITEM_ENHANCEMENT
+        or classID == CLASS.GLYPH
+    if materialLike and apiExpansionID == 0 and itemID then
+        if itemID >= 72000 then
+            return 4, "Classic material-era fallback"
+        elseif itemID >= 52000 then
+            return 3, "Classic material-era fallback"
+        elseif itemID >= 33000 then
+            return 2, "Classic material-era fallback"
+        elseif itemID >= 21800 then
+            return 1, "Classic material-era fallback"
+        end
+    end
+    if apiExpansionID ~= nil and apiExpansionID >= 0 then
+        return apiExpansionID, "item API"
+    end
+    return nil, "unavailable"
+end
