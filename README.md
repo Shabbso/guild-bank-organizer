@@ -154,6 +154,15 @@ The project currently targets MoP Classic only. Retail, Classic Era, Cataclysm
 Classic, and other clients should not be marked compatible without separate
 testing.
 
+## Source and support
+
+- Source: https://github.com/EricSlabsy/guild-bank-organizer
+- Issues: https://github.com/EricSlabsy/guild-bank-organizer/issues
+
+The source is publicly viewable for transparency and issue reporting. Public
+availability does not grant permission to copy, modify, redistribute, or
+publish derivative versions; see the license below.
+
 ## License
 
 Copyright (c) 2026 Eric Beane. All rights reserved. Official, unmodified

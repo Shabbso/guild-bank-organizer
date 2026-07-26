@@ -14,6 +14,8 @@ This file contains copy-ready metadata for the initial CurseForge publication.
 - **Experimental:** Off
 - **License:** All Rights Reserved
 - **Logo:** `assets/guild-bank-organizer-logo.png`
+- **Source:** https://github.com/EricSlabsy/guild-bank-organizer
+- **Issues:** https://github.com/EricSlabsy/guild-bank-organizer/issues
 
 Choose CurseForge's built-in **All Rights Reserved** option. If CurseForge
 instead presents a custom-license text box, paste the complete repository
@@ -211,3 +213,7 @@ Suggested gallery captions:
 9. Add at least one clean, genuine in-game screenshot to the gallery.
 10. Confirm the archive contains
     `GuildBankOrganizer/GuildBankOrganizer.toc`.
+
+For the CurseForge **Source** tab, choose GitHub, enter
+`https://github.com/EricSlabsy/guild-bank-organizer`, and leave **Automatic
+Packaging** set to **No automatic packaging** for the initial release.
