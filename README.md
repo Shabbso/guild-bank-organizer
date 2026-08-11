@@ -91,8 +91,10 @@ when the bag source and bank destination are provably unchanged. Nothing moves
 until the player clicks **Smart Deposit**.
 
 Category rules are based on the client item class, subclass, equipment slot,
-expansion ID, or an explicit item-ID list. Hover a category in setup to see the
-exact rule. The client combines raw fish, meat, and other cooking ingredients
+source-backed item era, or an explicit item-ID list. MoP Classic can report
+the unusable expansion value `254`; GBO resolves the era from Blizzard client
+item data bundled as compact correction ranges. Hover a category in setup to
+see the exact rule. The client combines raw fish, meat, and other cooking ingredients
 in one Trade Goods subclass, so that public category is intentionally named
 **Fish & Raw Cooking**. Known metadata exceptions are curated by item ID; for
 example, Spinefish is included even though WoW exposes it as an

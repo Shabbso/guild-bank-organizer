@@ -19,7 +19,7 @@ local itemDatabase = {
     [100] = { name = "Poor Widget", quality = 0, itemLevel = 1, maxStack = 20, sellPrice = 1, classID = 7, subclassID = 2 },
     [200] = { name = "Blue Widget", quality = 3, itemLevel = 10, maxStack = 20, sellPrice = 10, classID = 7, subclassID = 1 },
     [300] = { name = "Green Widget", quality = 2, itemLevel = 5, maxStack = 20, sellPrice = 5, classID = 7, subclassID = 1 },
-    [400] = { name = "Test Cloth", quality = 1, itemLevel = 1, maxStack = 20, sellPrice = 1, classID = 7, subclassID = 5 },
+    [72988] = { name = "Windwool Cloth", quality = 1, itemLevel = 1, maxStack = 20, sellPrice = 1, classID = 7, subclassID = 5, expansionID = 254 },
     [500] = { name = "Test Dust", quality = 1, itemLevel = 1, maxStack = 20, sellPrice = 1, classID = 7, subclassID = 12 },
     [74249] = { name = "Spirit Dust", quality = 1, itemLevel = 1, maxStack = 20, sellPrice = 1, classID = 7, subclassID = 12, expansionID = 0 },
     [83064] = { name = "Spinefish", quality = 1, itemLevel = 1, maxStack = 20, sellPrice = 1, classID = 7, subclassID = 11 },
@@ -511,6 +511,7 @@ local function loadAddonFile(path)
 end
 
 loadAddonFile("GuildBankOrganizer/Core.lua")
+loadAddonFile("GuildBankOrganizer/ExpansionData.lua")
 loadAddonFile("GuildBankOrganizer/Categories.lua")
 loadAddonFile("GuildBankOrganizer/Scanner.lua")
 loadAddonFile("GuildBankOrganizer/Diagnostics.lua")
@@ -521,7 +522,7 @@ loadAddonFile("GuildBankOrganizer/Commands.lua")
 
 assert(type(addon.ShowTestUI) == "function")
 assert(addon:ClassifyDepositItem({
-    itemID = 400,
+    itemID = 72988,
     classID = 7,
     subclassID = 5,
 }) == "cloth")
@@ -548,6 +549,13 @@ assert(addon:ClassifyDepositItem({
     classID = 0,
     subclassID = 5,
 }) == nil)
+local vellumCategory, vellumEvidence = addon:ClassifyDepositItem({
+    itemID = 38682,
+    classID = 7,
+    subclassID = 14,
+})
+assert(vellumCategory == "enchanting")
+assert(vellumEvidence == "curated item ID")
 local spiritDustExpansion, spiritDustEvidence =
     addon:ResolveDepositExpansion(74249, 0, Enum.ItemClass.Tradegoods)
 assert(spiritDustExpansion == 4)
@@ -555,7 +563,35 @@ assert(spiritDustEvidence == "curated item ID")
 local snowLilyExpansion, snowLilyEvidence =
     addon:ResolveDepositExpansion(97622, 0, Enum.ItemClass.Tradegoods)
 assert(snowLilyExpansion == 4)
-assert(snowLilyEvidence == "Classic material-era fallback")
+assert(snowLilyEvidence == "Classic item-era fallback")
+
+-- MoP Classic exposes expansionID=254 for item info. Expansion filtering
+-- must still work across every public Smart Deposit category, including item
+-- IDs near expansion boundaries where a numeric cutoff alone is ambiguous.
+local classicSilkExpansion =
+    addon:ResolveDepositExpansion(4306, 254, Enum.ItemClass.Tradegoods)
+assert(classicSilkExpansion == 0)
+local wrathFrostweaveExpansion =
+    addon:ResolveDepositExpansion(33470, 254, Enum.ItemClass.Tradegoods)
+assert(wrathFrostweaveExpansion == 2)
+local cataEmbersilkExpansion =
+    addon:ResolveDepositExpansion(53010, 254, Enum.ItemClass.Tradegoods)
+assert(cataEmbersilkExpansion == 3)
+local mistsWindwoolExpansion =
+    addon:ResolveDepositExpansion(72988, 254, Enum.ItemClass.Tradegoods)
+assert(mistsWindwoolExpansion == 4)
+local tbcFoodExpansion =
+    addon:ResolveDepositExpansion(22645, 254, Enum.ItemClass.Consumable)
+assert(tbcFoodExpansion == 1)
+local classicBoundaryWeaponExpansion =
+    addon:ResolveDepositExpansion(21806, 254, Enum.ItemClass.Weapon)
+assert(classicBoundaryWeaponExpansion == 0)
+local classicBoundaryBagExpansion =
+    addon:ResolveDepositExpansion(22248, 254, Enum.ItemClass.Container)
+assert(classicBoundaryBagExpansion == 0)
+local wrathGlyphExpansion =
+    addon:ResolveDepositExpansion(40896, 254, Enum.ItemClass.Glyph)
+assert(wrathGlyphExpansion == 2)
 
 GuildBankOrganizerDB = {
     schema = 4,
@@ -687,10 +723,10 @@ assert(#GuildBankOrganizerDB.runs == 4)
 -- Deposits use a separate confirmation-driven queue instead of the 1.25s
 -- intra-bank sort cadence.
 slots[1] = {
-    [1] = makeItem(400, 10),
+    [1] = makeItem(72988, 10),
 }
 bags[0] = {
-    [1] = makeItem(400, 15),
+    [1] = makeItem(72988, 15),
     [2] = makeItem(500, 7),
 }
 
@@ -714,6 +750,20 @@ assert(savedProfile.categories.cloth)
 assert(savedProfile.categories.enchanting)
 assert(not savedProfile.allExpansions)
 assert(savedProfile.expansions[4])
+numGuildBankTabs = 2
+local overlapSaved, overlapMessage = addon:SaveDepositProfile(
+    2,
+    true,
+    "All Cloth",
+    { cloth = true },
+    true,
+    {},
+    {}
+)
+assert(not overlapSaved)
+assert(string.find(overlapMessage, "All expansions includes Mists", 1, true))
+assert(string.find(overlapMessage, "Tab 1", 1, true))
+numGuildBankTabs = 1
 bags[0][3] = makeItem(74249, 20)
 bags[0][3].locked = true
 local lockedSpiritDustInspection = addon:InspectDepositProfile(1)
@@ -745,8 +795,8 @@ runTimers()
 
 assert(not addon:IsDepositRunning())
 assert(bags[0][1] == nil and bags[0][2] == nil)
-assert(slots[1][1] and slots[1][1].itemID == 400 and slots[1][1].count == 20)
-assert(slots[1][2] and slots[1][2].itemID == 400 and slots[1][2].count == 5)
+assert(slots[1][1] and slots[1][1].itemID == 72988 and slots[1][1].count == 20)
+assert(slots[1][2] and slots[1][2].itemID == 72988 and slots[1][2].count == 5)
 assert(slots[1][3] and slots[1][3].itemID == 500 and slots[1][3].count == 7)
 assert(string.find(addon.lastReport, "smart deposit report", 1, true))
 assert(string.find(addon.lastReport, "result=PASS", 1, true))

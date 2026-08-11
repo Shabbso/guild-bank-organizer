@@ -1,5 +1,20 @@
 # Changelog
 
+## 1.1.1 - 2026-08-11
+
+- Fixed Smart Deposit expansion filtering on MoP Classic clients that report
+  `expansionID=254`, including Silk Cloth, Frostweave Cloth, and other
+  expansion-filtered categories.
+- Added a compact generated correction table derived from Blizzard Item DB2
+  presence across Classic, TBC, Wrath, Cataclysm, and MoP Classic clients.
+- Extended the item-era fallback to Armor, Weapons, Trinkets, Bags, Battle
+  Pets, Food, and every other supported category instead of materials alone.
+- Added Enchanting Vellum (`38682`) to the Enchanting category.
+- Clarified that **All expansions** includes Mists when a profile overlaps a
+  category already assigned to another tab.
+- Added regression coverage for `expansionID=254`, overlapping item-ID eras,
+  Enchanting Vellum, and actionable profile-conflict feedback.
+
 ## 1.1.0 - 2026-07-26
 
 Public release of Smart Deposit and the redesigned organizer interface.

@@ -9,6 +9,11 @@ target, and BankStack was reviewed as an established example of guild-bank
 movement safeguards.
 
 No ElvUI or BankStack source files are bundled with this addon, and neither
-project is required at runtime. World of Warcraft and related marks are
+project is required at runtime. Smart Deposit's compact item-era correction
+ranges are generated from Blizzard client DB2 data served by Wago Tools; Wago
+Tools is not contacted by the addon and is not required at runtime.
+
+World of Warcraft and related marks are
 trademarks of Blizzard Entertainment. This project is not affiliated with or
-endorsed by Blizzard Entertainment, ElvUI, BankStack, Overwolf, or CurseForge.
+endorsed by Blizzard Entertainment, Wago Tools, ElvUI, BankStack, Overwolf, or
+CurseForge.

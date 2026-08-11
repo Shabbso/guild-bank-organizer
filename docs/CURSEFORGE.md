@@ -1,6 +1,6 @@
 # CurseForge release kit
 
-This file contains copy-ready metadata for the initial CurseForge publication.
+This file contains copy-ready metadata for CurseForge publication and updates.
 
 ## Project fields
 
@@ -217,3 +217,25 @@ Suggested gallery captions:
 For the CurseForge **Source** tab, choose GitHub, enter
 `https://github.com/Shabbso/guild-bank-organizer`, and leave **Automatic
 Packaging** set to **No automatic packaging** for the initial release.
+
+## Version 1.1.1 update
+
+- **File:** `dist/GuildBankOrganizer-1.1.1.zip`
+- **Display name:** Guild Bank Organizer 1.1.1
+- **Release options:** Release when approved
+- **Release type:** Release
+- **Supported version:** Mists of Pandaria Classic 5.5.4
+- **Related projects:** None
+
+Copy the following into the upload's Changelog field:
+
+### Guild Bank Organizer 1.1.1
+
+- Fixed Smart Deposit expansion filtering for cloth and every other supported
+  category when MoP Classic reports the unusable expansion value `254`.
+- Added reliable Classic-through-Mists item-era data for expansion profiles.
+- Added Enchanting Vellum to the Enchanting category.
+- Improved profile-conflict guidance when **All expansions** overlaps another
+  assigned tab.
+- Added regression coverage for expansion-era boundaries and affected item
+  categories.
