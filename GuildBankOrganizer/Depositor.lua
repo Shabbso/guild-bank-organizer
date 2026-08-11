@@ -190,6 +190,13 @@ function GBO:SaveDepositProfile(
                         otherProfile.expansions or {}
                     )
                 then
+                    if allExpansions or otherProfile.allExpansions ~= false then
+                        return false, string.format(
+                            "%s overlaps Tab %d. All expansions includes Mists and every earlier era; select only eras not routed to another tab.",
+                            self:GetDepositCategoryName(key),
+                            otherTab
+                        )
+                    end
                     return false, string.format(
                         "%s already routes an overlapping expansion to Tab %d.",
                         self:GetDepositCategoryName(key),

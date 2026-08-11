@@ -51,6 +51,7 @@ local LOCKBOX_ITEM_IDS = {
 -- false means "do not route through a broad category." Exact item-ID profile
 -- rules can still opt such an item in, although soulbound items remain blocked.
 local CATEGORY_ITEM_OVERRIDES = {
+    [38682] = "enchanting", -- Enchanting Vellum: Trade Goods / Other in Classic
     [83064] = "fish", -- Spinefish: Alchemy reagent obtained through fishing
     [103641] = false, -- Singing Crystal: soulbound Timeless Isle combat buff
 }
@@ -315,32 +316,34 @@ function GBO:ResolveDepositExpansion(
     end
 
     apiExpansionID = tonumber(apiExpansionID)
-    if apiExpansionID ~= nil and apiExpansionID > 0 then
-        return apiExpansionID, "item API"
-    end
+    local maximumExpansionID = expansions[#expansions].id
+    local supportedAPIExpansion = apiExpansionID ~= nil
+        and apiExpansionID >= 0
+        and apiExpansionID <= maximumExpansionID
 
-    -- On MoP Classic 5.5.4, C_Item.GetItemInfo can return expacID=0 for
-    -- post-Classic materials (for example Snow Lily Petal 97622). Use the
-    -- item-number era only for material-like classes; equipment keeps the API
-    -- value because expansion-era item numbers overlap near release borders.
-    local materialLike = classID == CLASS.CONSUMABLE
-        or classID == CLASS.CONTAINER
-        or classID == CLASS.GEM
-        or classID == CLASS.TRADEGOODS
-        or classID == CLASS.ITEM_ENHANCEMENT
-        or classID == CLASS.GLYPH
-    if materialLike and apiExpansionID == 0 and itemID then
-        if itemID >= 72000 then
-            return 4, "Classic material-era fallback"
+    -- The MoP Classic client commonly exposes expansionID=254 for every item,
+    -- and some cache states expose 0 for post-Classic items. Resolve those
+    -- values from first appearance in Blizzard's Classic client Item DB2 data.
+    -- The generated table stores only the places where compact item-ID era
+    -- thresholds overlap, so this remains accurate for equipment as well as
+    -- profession materials without bundling a full item database.
+    if itemID and (not supportedAPIExpansion or apiExpansionID == 0) then
+        local generated = self.GetGeneratedDepositExpansion
+            and self:GetGeneratedDepositExpansion(itemID)
+        if generated ~= nil then
+            return generated, "Classic client item-era data"
+        elseif itemID >= 72000 then
+            return 4, "Classic item-era fallback"
         elseif itemID >= 52000 then
-            return 3, "Classic material-era fallback"
+            return 3, "Classic item-era fallback"
         elseif itemID >= 33000 then
-            return 2, "Classic material-era fallback"
+            return 2, "Classic item-era fallback"
         elseif itemID >= 21800 then
-            return 1, "Classic material-era fallback"
+            return 1, "Classic item-era fallback"
         end
+        return 0, "Classic item-era fallback"
     end
-    if apiExpansionID ~= nil and apiExpansionID >= 0 then
+    if supportedAPIExpansion then
         return apiExpansionID, "item API"
     end
     return nil, "unavailable"

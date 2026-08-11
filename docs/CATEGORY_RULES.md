@@ -25,7 +25,7 @@ swallowed by the broader Armor rule.
 | Inscription | Glyph class or Trade Goods Inscription subclass 16 |
 | Leather | Trade Goods subclass 6 |
 
-The expansion filter uses the `expacID` returned by `C_Item.GetItemInfo`:
+The expansion filter uses these public IDs:
 
 | ID | Expansion |
 | --- | --- |
@@ -49,9 +49,18 @@ item IDs.
 Exact item IDs take precedence over category rules. Bound and locked bag items
 are never included in a deposit plan.
 
-MoP Classic can return `expacID=0` for post-Classic materials even when the
-class/subclass data is correct. Curated IDs take precedence for the four core
-MoP enchanting materials: Spirit Dust (`74249`), Mysterious Essence (`74250`),
-Ethereal Shard (`74247`), and Sha Crystal (`74248`). Other material-like items
-use their item-number era when the API incorrectly reports Classic; this
-correctly resolves items such as Snow Lily Petal (`97622`) to Mists.
+MoP Classic can return `expansionID=254` for items from every era, or report
+`0` for post-Classic items in some cache states. Those values are not reliable
+enough to drive profiles directly.
+
+GBO instead uses the item's first presence in Blizzard's late Classic, TBC,
+Wrath, Cataclysm, and MoP Classic client `Item` DB2 tables. A generated table
+stores only the ranges where expansion-era item-number thresholds overlap;
+the remaining IDs use compact thresholds. This covers every public category,
+including equipment, without bundling a complete item database. Exact curated
+IDs still take precedence for special cases such as core MoP enchanting
+materials.
+
+The generated source builds and regeneration command are recorded in
+`GuildBankOrganizer/ExpansionData.lua` and
+`scripts/generate_expansion_data.py`.
