@@ -144,30 +144,8 @@ function GBO:InitializeDatabase()
     if type(GuildBankOrganizerDB.depositProfiles) ~= "table" then
         GuildBankOrganizerDB.depositProfiles = {}
     end
-    if previousSchema < 5 then
-        for _, guildProfiles in pairs(GuildBankOrganizerDB.depositProfiles) do
-            if type(guildProfiles) == "table" then
-                for _, profile in pairs(guildProfiles) do
-                    if type(profile) == "table"
-                        and profile.enabledStateVersion == nil
-                        and (
-                            type(profile.categories) == "table"
-                                and next(profile.categories)
-                            or type(profile.exactItemIDs) == "table"
-                                and next(profile.exactItemIDs)
-                        )
-                    then
-                        -- beta.2-beta.3 could draw the checkbox as enabled
-                        -- while GetChecked still saved false. Configured
-                        -- profiles from that schema are repaired once.
-                        profile.enabled = true
-                        profile.enabledStateVersion = 1
-                    end
-                end
-            end
-        end
-    end
-    GuildBankOrganizerDB.schema = 5
+    self:MigrateDepositProfileDatabase(GuildBankOrganizerDB, previousSchema)
+    GuildBankOrganizerDB.schema = 6
 
     local cadence = tonumber(GuildBankOrganizerDB.settings.sortCadence)
     if not cadence

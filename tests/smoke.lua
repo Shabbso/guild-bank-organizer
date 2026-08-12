@@ -551,6 +551,7 @@ loadAddonFile("GuildBankOrganizer/Core.lua")
 loadAddonFile("GuildBankOrganizer/ExpansionData.lua")
 loadAddonFile("GuildBankOrganizer/ProfessionData.lua")
 loadAddonFile("GuildBankOrganizer/Categories.lua")
+loadAddonFile("GuildBankOrganizer/ProfileStore.lua")
 loadAddonFile("GuildBankOrganizer/Scanner.lua")
 loadAddonFile("GuildBankOrganizer/Diagnostics.lua")
 loadAddonFile("GuildBankOrganizer/Sorter.lua")
@@ -747,18 +748,28 @@ local wrathGlyphExpansion =
 assert(wrathGlyphExpansion == 2)
 
 GuildBankOrganizerDB = {
-    schema = 4,
+    schema = 5,
     settings = {},
     runs = {},
     depositProfiles = {
         ["Test Realm\031Test Guild"] = {
-            [2] = {
-                enabled = false,
-                label = "Affected beta profile",
-                categories = { enchanting = true },
-                allExpansions = false,
-                expansions = { [4] = true },
+            [1] = {
+                enabled = true,
+                label = "Shared supplies",
+                categories = { profession_supplies = true },
+                allExpansions = true,
+                expansions = {},
                 exactItemIDs = { [3371] = true },
+                enabledStateVersion = 1,
+            },
+            [2] = {
+                enabled = "yes",
+                label = {},
+                categories = "not a table",
+                allExpansions = false,
+                expansions = "not a table",
+                exactItemIDs = { [-1] = true },
+                unexpected = true,
             },
             [3] = {
                 enabled = false,
@@ -769,16 +780,151 @@ GuildBankOrganizerDB = {
                 exactItemIDs = { [3371] = true },
                 enabledStateVersion = 1,
             },
+            [4] = {
+                enabled = true,
+                label = "Unknown category",
+                categories = { removed_category = true },
+                allExpansions = true,
+                expansions = {},
+                exactItemIDs = {},
+                enabledStateVersion = 1,
+            },
+            [5] = "not a profile table",
         },
     },
 }
+local getNumGuildBankTabs = GetNumGuildBankTabs
+GetNumGuildBankTabs = function()
+    error("migration must not inspect open guild-bank tabs")
+end
 fire("ADDON_LOADED", addonName)
-assert(GuildBankOrganizerDB.schema == 5)
-assert(addon:GetDepositProfile(2, false).enabled)
+GetNumGuildBankTabs = getNumGuildBankTabs
+assert(GuildBankOrganizerDB.schema == 6)
+assert(addon:GetDepositProfile(1, false).categories.profession_supplies)
+assert(addon:GetDepositProfile(1, false).enabled)
+assert(not addon:GetDepositProfile(2, false).enabled)
+local profileRecovery = assert(addon:GetDepositProfileRecovery())
+assert(profileRecovery["Test Realm\031Test Guild"][2].unexpected)
+assert(profileRecovery["Test Realm\031Test Guild"][4].categories.removed_category)
+assert(not addon:GetDepositProfile(4, false).enabled)
+assert(profileRecovery["Test Realm\031Test Guild"][5] == "not a profile table")
+assert(not addon:GetDepositProfile(5, false).enabled)
 local exactTabs = addon:GetExactDepositProfileTabs(3371)
-assert(#exactTabs == 1 and exactTabs[1] == 2)
+assert(#exactTabs == 1 and exactTabs[1] == 1)
 local exactVialReference = assert(addon:DescribeProfessionReference(3371))
-assert(#exactVialReference.exactTabs == 1 and exactVialReference.exactTabs[1] == 2)
+assert(#exactVialReference.exactTabs == 1 and exactVialReference.exactTabs[1] == 1)
+
+local validDraft = {
+    enabled = true,
+    label = "  Classic Herbs  ",
+    categories = { herbs = true },
+    allExpansions = false,
+    expansions = { [0] = true },
+    exactItemIDs = { ["3371"] = true },
+}
+local draftSaved, normalizedDraft = addon:SaveDepositProfileDraft(1, validDraft)
+assert(draftSaved)
+assert(normalizedDraft.label == "Classic Herbs")
+assert(normalizedDraft.exactItemIDs[3371])
+assert(validDraft.label == "  Classic Herbs  ")
+assert(validDraft.exactItemIDs["3371"])
+assert(not addon:ValidateDepositProfile(0, validDraft))
+local unknownDraft, unknownReason = addon:ValidateDepositProfile(1, {
+    enabled = false,
+    label = "Unknown",
+    categories = { removed_category = true },
+    allExpansions = true,
+    expansions = {},
+    exactItemIDs = {},
+})
+assert(not unknownDraft)
+assert(string.find(unknownReason, "removed_category", 1, true))
+local invalidItemDraft, invalidItemReason = addon:ValidateDepositProfile(1, {
+    enabled = false,
+    label = "Invalid ID",
+    categories = {},
+    allExpansions = true,
+    expansions = {},
+    exactItemIDs = { [-1] = true },
+})
+assert(not invalidItemDraft)
+assert(string.find(invalidItemReason, "positive", 1, true))
+local disabledDraft = assert(addon:ValidateDepositProfile(1, {
+    enabled = false,
+    label = "  Later  ",
+    categories = {},
+    allExpansions = false,
+    expansions = {},
+    exactItemIDs = {},
+}))
+assert(not disabledDraft.enabled)
+assert(disabledDraft.label == "Later")
+assert(not disabledDraft.allExpansions)
+assert(not next(disabledDraft.categories))
+assert(not next(disabledDraft.expansions))
+assert(not next(disabledDraft.exactItemIDs))
+local savedDraft = addon:GetDepositProfile(1, false)
+local invalidSaved, invalidReason = addon:SaveDepositProfileDraft(1, {
+    enabled = true,
+    label = "Invalid replacement",
+    categories = { herbs = true },
+    allExpansions = false,
+    expansions = {},
+    exactItemIDs = {},
+})
+assert(not invalidSaved)
+assert(string.find(invalidReason, "expansion", 1, true))
+assert(addon:GetDepositProfile(1, false) == savedDraft)
+assert(savedDraft.enabled)
+assert(savedDraft.label == "Classic Herbs")
+assert(savedDraft.categories.herbs)
+assert(not savedDraft.allExpansions)
+assert(savedDraft.expansions[0])
+assert(savedDraft.exactItemIDs[3371])
+
+addon.db = nil
+GetNumGuildBankTabs = function()
+    error("reload migration must not inspect open guild-bank tabs")
+end
+addon:InitializeDatabase()
+GetNumGuildBankTabs = getNumGuildBankTabs
+local reloadedDraft = addon:GetDepositProfile(1, false)
+assert(reloadedDraft.enabled)
+assert(reloadedDraft.label == "Classic Herbs")
+assert(reloadedDraft.categories.herbs)
+assert(not reloadedDraft.allExpansions)
+assert(reloadedDraft.expansions[0])
+assert(reloadedDraft.exactItemIDs[3371])
+
+local firstRecovery = addon:GetDepositProfileRecovery()["Test Realm\031Test Guild"][2]
+GuildBankOrganizerDB.depositProfiles["Test Realm\031Test Guild"][2] = {
+    enabled = "still malformed",
+    categories = {},
+    allExpansions = true,
+    expansions = {},
+    exactItemIDs = {},
+}
+addon:MigrateDepositProfileDatabase(GuildBankOrganizerDB, 5)
+assert(addon:GetDepositProfileRecovery()["Test Realm\031Test Guild"][2] == firstRecovery)
+assert(not addon:GetDepositProfile(2, false).enabled)
+
+local legacyDatabase = {
+    depositProfiles = {
+        ["Legacy Realm\031Legacy Guild"] = {
+            [2] = {
+                enabled = false,
+                label = "Affected beta profile",
+                categories = { enchanting = true },
+                allExpansions = false,
+                expansions = { [4] = true },
+                exactItemIDs = {},
+            },
+        },
+    },
+}
+addon:MigrateDepositProfileDatabase(legacyDatabase, 4)
+assert(legacyDatabase.depositProfiles["Legacy Realm\031Legacy Guild"][2].enabled)
+assert(legacyDatabase.depositProfiles["Legacy Realm\031Legacy Guild"][2].enabledStateVersion == 1)
 addon:GetDepositProfiles(false)[2] = nil
 fire("PLAYER_LOGIN")
 fire("GUILDBANKFRAME_OPENED")
@@ -919,8 +1065,9 @@ assert(savedProfile.categories.cloth)
 assert(savedProfile.categories.enchanting)
 assert(not savedProfile.allExpansions)
 assert(savedProfile.expansions[4])
+assert(savedProfile.exactItemIDs[3371])
 numGuildBankTabs = 2
-local overlapSaved, overlapMessage = addon:SaveDepositProfile(
+local allClothSaved = addon:SaveDepositProfile(
     2,
     true,
     "All Cloth",
@@ -929,9 +1076,61 @@ local overlapSaved, overlapMessage = addon:SaveDepositProfile(
     {},
     {}
 )
+assert(allClothSaved)
+local allClothProfile = addon:GetDepositProfile(2, false)
+local bothAllSaved, bothAllMessage = addon:SaveDepositProfile(
+    1,
+    true,
+    "All Cloth Duplicate",
+    { cloth = true },
+    true,
+    {},
+    {}
+)
+assert(not bothAllSaved)
+assert(addon:GetDepositProfile(1, false) == savedProfile)
+assert(string.find(bothAllMessage, "Cloth", 1, true))
+assert(string.find(bothAllMessage, "Tab 1", 1, true))
+assert(string.find(bothAllMessage, "Tab 2", 1, true))
+local overlapSaved, overlapMessage = addon:SaveDepositProfile(
+    2,
+    true,
+    "Mists Cloth",
+    { cloth = true },
+    false,
+    { [4] = true },
+    {}
+)
 assert(not overlapSaved)
-assert(string.find(overlapMessage, "All expansions includes Mists", 1, true))
+assert(addon:GetDepositProfile(2, false) == allClothProfile)
+assert(string.find(overlapMessage, "Cloth", 1, true))
 assert(string.find(overlapMessage, "Tab 1", 1, true))
+assert(string.find(overlapMessage, "Tab 2", 1, true))
+local duplicateExactSaved, duplicateExactMessage = addon:SaveDepositProfile(
+    2,
+    true,
+    "Duplicate vial",
+    {},
+    true,
+    {},
+    { [3371] = true }
+)
+assert(not duplicateExactSaved)
+assert(addon:GetDepositProfile(2, false) == allClothProfile)
+assert(string.find(duplicateExactMessage, "3371", 1, true))
+assert(string.find(duplicateExactMessage, "Tab 1", 1, true))
+assert(string.find(duplicateExactMessage, "Tab 2", 1, true))
+assert(addon:SaveDepositProfile(
+    2,
+    true,
+    "Alchemy category",
+    { alchemy = true },
+    true,
+    {},
+    {}
+))
+addon:AbortDeposit("test profile cleanup")
+addon:GetDepositProfiles(false)[2] = nil
 numGuildBankTabs = 1
 bags[0][3] = makeItem(74249, 20)
 bags[0][3].locked = true
