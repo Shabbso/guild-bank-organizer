@@ -42,8 +42,8 @@ away. Profiles are stored per guild in SavedVariables and survive logout and
 One profile can contain any number of categories. For example:
 
 - **Tab 2 — Tailoring & Enchanting:** Cloth + Enchanting;
-- **Tab 3 — Mining & Blacksmithing:** Metal & Stone + Elemental;
-- **Tab 4 — Alchemy & Inscription:** Herbs + Pigments + Inks.
+- **Tab 3 — Mining & Blacksmithing:** Ore, Bars & Stone + Elemental;
+- **Tab 4 — Alchemy & Inscription:** Herbs + Inscription.
 
 A category and specific expansion pair normally has one destination. For
 example, Mists Herbs and Classic-through-Cataclysm Herbs may use separate tabs.
