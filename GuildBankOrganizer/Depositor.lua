@@ -134,6 +134,7 @@ function GBO:GetExactDepositProfileTabs(itemID)
         tab = tonumber(tab)
         if tab
             and type(profile) == "table"
+            and profile.enabled
             and type(profile.exactItemIDs) == "table"
             and profile.exactItemIDs[itemID]
         then

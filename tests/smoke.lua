@@ -26,7 +26,11 @@ local itemDatabase = {
     [79254] = { name = "Ink of Dreams", quality = 1, itemLevel = 85, maxStack = 20, sellPrice = 1, classID = 7, subclassID = 1, bagFamily = 16, expansionID = 254 },
     [4359] = { name = "Handful of Copper Bolts", quality = 1, itemLevel = 10, maxStack = 20, sellPrice = 1, classID = 7, subclassID = 1, bagFamily = 128, expansionID = 0 },
     [2581] = { name = "Heavy Linen Bandage", quality = 1, itemLevel = 20, maxStack = 20, sellPrice = 1, classID = 0, subclassID = 7, expansionID = 0 },
+    [2406] = { name = "Pattern: Fine Leather Boots", quality = 1, itemLevel = 1, maxStack = 1, sellPrice = 1, classID = 9, subclassID = 1, expansionID = 0 },
     [4408] = { name = "Schematic: Mechanical Squirrel Box", quality = 1, itemLevel = 15, maxStack = 1, sellPrice = 1, classID = 9, subclassID = 3, bagFamily = 128, expansionID = 0 },
+    [4293] = { name = "Pattern: Hillman's Leather Vest", quality = 1, itemLevel = 1, maxStack = 1, sellPrice = 1, classID = 9, subclassID = 1, expansionID = 0 },
+    [4342] = { name = "Purple Dye", quality = 1, itemLevel = 1, maxStack = 20, sellPrice = 1, classID = 7, subclassID = 11, expansionID = 0 },
+    [4357] = { name = "Rough Blasting Powder", quality = 1, itemLevel = 1, maxStack = 20, sellPrice = 1, classID = 7, subclassID = 1, expansionID = 0 },
     [785] = { name = "Mageroyal", quality = 1, itemLevel = 1, maxStack = 20, sellPrice = 1, classID = 7, subclassID = 9, expansionID = 0 },
     [2604] = { name = "Red Dye", quality = 1, itemLevel = 1, maxStack = 20, sellPrice = 1, classID = 7, subclassID = 11, expansionID = 0 },
     [3371] = { name = "Crystal Vial", quality = 1, itemLevel = 5, maxStack = 20, sellPrice = 1, classID = 7, subclassID = 11, bagFamily = 16, expansionID = 0 },
@@ -34,6 +38,7 @@ local itemDatabase = {
     [39354] = { name = "Light Parchment", quality = 1, itemLevel = 1, maxStack = 20, sellPrice = 1, classID = 7, subclassID = 11, expansionID = 2 },
     [52078] = { name = "Chaos Orb", quality = 1, itemLevel = 1, maxStack = 20, sellPrice = 1, classID = 7, subclassID = 11, expansionID = 3 },
     [23418] = { name = "Test Sapper Charge", quality = 1, itemLevel = 1, maxStack = 20, sellPrice = 1, classID = 7, subclassID = 11, expansionID = 1 },
+    [23572] = { name = "Primal Nether", quality = 1, itemLevel = 1, maxStack = 20, sellPrice = 1, classID = 7, subclassID = 11, expansionID = 1 },
     [79868] = { name = "Pandaren Pottery Shard", quality = 1, itemLevel = 1, maxStack = 20, sellPrice = 1, classID = 7, subclassID = 11, expansionID = 254 },
     [83064] = { name = "Spinefish", quality = 1, itemLevel = 1, maxStack = 20, sellPrice = 1, classID = 7, subclassID = 11 },
     [103641] = { name = "Singing Crystal", quality = 1, itemLevel = 1, maxStack = 20, sellPrice = 1, classID = 0, subclassID = 5 },
@@ -564,6 +569,7 @@ assert(select(1, addon:ClassifyDepositItem(readTestItem(2604))) == "tailoring")
 assert(select(1, addon:ClassifyDepositItem(readTestItem(39354))) == "inscription")
 assert(select(1, addon:ClassifyDepositItem(readTestItem(37602))) == "enchanting")
 assert(select(1, addon:ClassifyDepositItem(readTestItem(52078))) == "profession_supplies")
+assert(select(1, addon:ClassifyDepositItem(readTestItem(23572))) == "profession_supplies")
 assert(select(1, addon:ClassifyDepositItem(readTestItem(23418))) == nil)
 assert(addon:GetDepositCategoryName("profession_supplies") == "Shared Crafting Reagents")
 
@@ -576,8 +582,20 @@ assert(generatedVialReference.expansionName == nil)
 assert(generatedVialReference.exactTabs == nil)
 local excludedReference = assert(addon:DescribeProfessionReference(23418))
 assert(excludedReference.status == "excluded")
+local spinefishReference = assert(addon:DescribeProfessionReference(83064))
+assert(select(1, addon:ClassifyDepositItem(readTestItem(83064))) == "fish")
+assert(spinefishReference.categoryKey == "fish")
+assert(spinefishReference.evidence == "curated gameplay item ID")
 local shared = addon:GetSharedCraftingReagents()
 assert(#shared == 19)
+for _, itemID in ipairs({
+    785, 3371, 2604, 39354, 37602, 52078, 23572, 23418, 83064, 79254,
+}) do
+    assert(
+        select(1, addon:ClassifyDepositItem(readTestItem(itemID)))
+            == addon:DescribeProfessionReference(itemID).categoryKey
+    )
+end
 assert(addon:ClassifyDepositItem({
     itemID = 999,
     classID = 4,
@@ -616,13 +634,13 @@ local pigmentCategory, pigmentEvidence = addon:ClassifyDepositItem({
 })
 assert(pigmentCategory == "inscription")
 assert(pigmentEvidence == "MoP profession item data")
-local inkCategory = addon:ClassifyDepositItem({
-    itemID = 79254,
-    classID = 7,
-    subclassID = 1,
-    bagFamily = 16,
-})
-assert(inkCategory == "engineering")
+local inkCategory = addon:ClassifyDepositItem(readTestItem(79254))
+assert(inkCategory == "inscription")
+assert(addon:DescribeProfessionReference(79254).categoryKey == inkCategory)
+assert(addon:ClassifyDepositItem(readTestItem(4357)) == "engineering")
+assert(addon:ClassifyDepositItem(readTestItem(4342)) == "tailoring")
+assert(addon:ClassifyDepositItem(readTestItem(2406)) == "leatherworking")
+assert(addon:ClassifyDepositItem(readTestItem(4293)) == "leatherworking")
 local boltsCategory = addon:ClassifyDepositItem({
     itemID = 4359,
     classID = 7,
@@ -741,6 +759,15 @@ GuildBankOrganizerDB = {
                 allExpansions = false,
                 expansions = { [4] = true },
                 exactItemIDs = { [3371] = true },
+            },
+            [3] = {
+                enabled = false,
+                label = "Disabled exact profile",
+                categories = {},
+                allExpansions = true,
+                expansions = {},
+                exactItemIDs = { [3371] = true },
+                enabledStateVersion = 1,
             },
         },
     },

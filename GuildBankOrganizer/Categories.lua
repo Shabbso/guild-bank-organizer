@@ -322,14 +322,11 @@ local categories = {
         key = "engineering",
         name = "Engineering",
         description = "Parts, explosives, devices, scopes, schematics, and other Engineering products. Equipment stays in Armor or Weapons.",
-        evidence = "Item metadata and generated profession data",
-        examples = { "Handful of Copper Bolts", "Ghost Iron Dragonling" },
+        evidence = "Recipe and generated profession data",
+        examples = { "Handful of Copper Bolts", "Rough Blasting Powder" },
         matches = function(item)
-            return item.classID == CLASS.TRADEGOODS
-                    and item.subclassID >= 1
-                    and item.subclassID <= 3
-                or item.classID == CLASS.RECIPE
-                    and item.subclassID == RECIPE.ENGINEERING
+            return item.classID == CLASS.RECIPE
+                and item.subclassID == RECIPE.ENGINEERING
         end,
     },
     {
@@ -337,7 +334,7 @@ local categories = {
         name = "Tailoring",
         description = "Patterns, dyes, nets, and other Tailoring supplies or products. Raw cloth and bags stay in their own categories.",
         evidence = "Recipe and generated profession data",
-        examples = { "Red Dye", "Bolt of Embersilk Cloth" },
+        examples = { "Red Dye", "Purple Dye" },
         matches = recipeIs(RECIPE.TAILORING),
     },
     {
@@ -345,7 +342,7 @@ local categories = {
         name = "Leatherworking",
         description = "Patterns, drums, kits, and other Leatherworking supplies or products. Raw leather and armor stay in their own categories.",
         evidence = "Recipe and generated profession data",
-        examples = { "Drums of Speed", "Heavy Armor Kit" },
+        examples = { "Pattern: Fine Leather Boots", "Pattern: Hillman's Leather Vest" },
         matches = recipeIs(RECIPE.LEATHERWORKING),
     },
     {
@@ -364,9 +361,9 @@ local categories = {
     {
         key = "profession_supplies",
         name = "Shared Crafting Reagents",
-        description = "Crafting reagents with no single defensible profession owner, including Crystal Vials, dyes, and raid crafting reagents.",
+        description = "Crafting reagents with no single defensible profession owner, such as Chaos Orbs and Primal Nethers.",
         evidence = "Generated multi-profession recipe data",
-        examples = { "Crystal Vial", "Chaos Orb" },
+        examples = { "Chaos Orb", "Primal Nether" },
         matches = function()
             return false
         end,
@@ -427,6 +424,11 @@ function GBO:DescribeProfessionReference(itemID)
     local reference = {}
     for key, value in pairs(record) do
         reference[key] = value
+    end
+    local gameplayOverride = GAMEPLAY_ITEM_OVERRIDES[reference.itemID]
+    if gameplayOverride ~= nil then
+        reference.categoryKey = gameplayOverride or nil
+        reference.evidence = "curated gameplay item ID"
     end
     reference.categoryName = reference.categoryKey
         and self:GetDepositCategoryName(reference.categoryKey)
