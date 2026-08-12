@@ -12,6 +12,7 @@ ExpansionData.lua
 ProfessionData.lua
 Categories.lua
 ProfileStore.lua
+CategoryReference.lua
 Scanner.lua
 Diagnostics.lua
 Sorter.lua

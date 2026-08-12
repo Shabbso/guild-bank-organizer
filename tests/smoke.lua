@@ -586,6 +586,7 @@ loadAddonFile("GuildBankOrganizer/ExpansionData.lua")
 loadAddonFile("GuildBankOrganizer/ProfessionData.lua")
 loadAddonFile("GuildBankOrganizer/Categories.lua")
 loadAddonFile("GuildBankOrganizer/ProfileStore.lua")
+loadAddonFile("GuildBankOrganizer/CategoryReference.lua")
 loadAddonFile("GuildBankOrganizer/Scanner.lua")
 loadAddonFile("GuildBankOrganizer/Diagnostics.lua")
 loadAddonFile("GuildBankOrganizer/Sorter.lua")
@@ -594,6 +595,84 @@ loadAddonFile("GuildBankOrganizer/UI.lua")
 loadAddonFile("GuildBankOrganizer/Commands.lua")
 
 assert(type(addon.ShowTestUI) == "function")
+local categorySections = addon:GetCategoryReferenceSections()
+local herbsSection
+local sharedSection
+for index, section in ipairs(categorySections) do
+    if index > 1 then
+        assert(categorySections[index - 1].name <= section.name)
+    end
+    if section.key == "herbs" then
+        herbsSection = section
+    elseif section.key == "profession_supplies" then
+        sharedSection = section
+    end
+end
+assert(herbsSection and #herbsSection.examples > 0)
+assert(sharedSection and sharedSection.name == "Shared Crafting Reagents")
+local originalHerbExample = herbsSection.examples[1]
+herbsSection.examples[1] = "mutated by reference caller"
+local freshHerbsSection
+for _, section in ipairs(addon:GetCategoryReferenceSections()) do
+    if section.key == "herbs" then
+        freshHerbsSection = section
+    end
+end
+assert(freshHerbsSection.examples[1] == originalHerbExample)
+
+local getItemInfoBeforeColdSearch = GetItemInfo
+local cItemGetItemInfoBeforeColdSearch = C_Item.GetItemInfo
+GetItemInfo = function()
+    error("category reference search must not use the live item cache")
+end
+C_Item.GetItemInfo = GetItemInfo
+local coldVialResults = addon:SearchProfessionReference("vial", 50)
+local formattedColdVial
+for _, record in ipairs(coldVialResults) do
+    assert(record.name ~= "Test Sapper Charge")
+    if record.itemID == 3371 then
+        formattedColdVial = addon:FormatCategoryReferenceResult(record)
+    end
+end
+assert(formattedColdVial)
+assert(formattedColdVial.name == "Crystal Vial")
+assert(formattedColdVial.categoryName == "Alchemy")
+assert(formattedColdVial.expansionName == "Classic")
+assert(formattedColdVial.evidence == "curated player-facing category")
+GetItemInfo = getItemInfoBeforeColdSearch
+C_Item.GetItemInfo = cItemGetItemInfoBeforeColdSearch
+
+local formattedExcluded = addon:FormatCategoryReferenceResult(
+    addon:SearchProfessionReference("23418", 50)[1]
+)
+assert(formattedExcluded.name == "Test Sapper Charge")
+assert(formattedExcluded.status == "excluded")
+assert(string.find(formattedExcluded.statusText, "internal test item", 1, true))
+assert(#addon:SearchProfessionReference("Test Sapper Charge", 50) == 0)
+local unsupportedReference = addon:FormatCategoryReferenceResult({
+    itemID = 999999,
+    name = "Unknown",
+})
+assert(unsupportedReference.status == "unsupported")
+assert(
+    unsupportedReference.statusText
+        == "No bundled MoP Classic profession item found."
+)
+
+local expectedSharedIDs = {
+    4402, 5635, 5637, 12811, 23572, 30183, 32428, 34664, 43102,
+    45087, 47556, 49908, 52078, 69237, 71998, 80433, 83092, 94289,
+    102218,
+}
+local sharedReferenceResults = addon:GetSharedCraftingReagents()
+assert(#sharedReferenceResults == #expectedSharedIDs)
+for index, record in ipairs(sharedReferenceResults) do
+    assert(record.itemID == expectedSharedIDs[index])
+    local formatted = addon:FormatCategoryReferenceResult(record)
+    assert(formatted.categoryName == "Shared Crafting Reagents")
+    assert(formatted.expansionID >= 0 and formatted.expansionID <= 4)
+    assert(type(formatted.expansionName) == "string")
+end
 assert(addon:ClassifyDepositItem({
     itemID = 72988,
     classID = 7,
@@ -847,6 +926,11 @@ local exactTabs = addon:GetExactDepositProfileTabs(3371)
 assert(#exactTabs == 1 and exactTabs[1] == 1)
 local exactVialReference = assert(addon:DescribeProfessionReference(3371))
 assert(#exactVialReference.exactTabs == 1 and exactVialReference.exactTabs[1] == 1)
+local formattedExactVial = addon:FormatCategoryReferenceResult(exactVialReference)
+assert(formattedExactVial.categoryName == "Alchemy")
+assert(#formattedExactVial.exactTabs == 1 and formattedExactVial.exactTabs[1] == 1)
+assert(string.find(formattedExactVial.exactRouteText, "Tab 1", 1, true))
+assert(string.find(formattedExactVial.exactRouteText, "Shared supplies", 1, true))
 
 local validDraft = {
     enabled = true,
@@ -992,6 +1076,63 @@ assert(GuildBankOrganizerFrame.DepositCurrentButton:GetText() == "Deposit This T
 assert(GuildBankOrganizerFrame.DepositAllButton:GetText() == "Deposit All Tabs")
 assert(not GuildBankOrganizerFrame.DepositStopButton:IsShown())
 addon:ShowTestUI()
+assert(GuildBankOrganizerAdvancedFrame:IsShown())
+assert(string.find(
+    GuildBankOrganizerAdvancedFrame.RecoveryText:GetText(),
+    "Recovered Smart Deposit data",
+    1,
+    true
+))
+GuildBankOrganizerAdvancedFrame.CategoryReferenceButton.scripts.OnClick()
+assert(GuildBankOrganizerCategoryReferenceFrame:IsShown())
+assert(not GuildBankOrganizerAdvancedFrame:IsShown())
+assert(GuildBankOrganizerCategoryReferenceFrame.SearchInput)
+assert(GuildBankOrganizerCategoryReferenceFrame.SearchButton)
+assert(GuildBankOrganizerCategoryReferenceFrame.CategoryList)
+assert(GuildBankOrganizerCategoryReferenceFrame.ResultList)
+assert(GuildBankOrganizerCategoryReferenceFrame.SharedButton)
+assert(GuildBankOrganizerCategoryReferenceFrame.BackButton)
+
+GuildBankOrganizerCategoryReferenceFrame.SearchInput:SetText("vial")
+GuildBankOrganizerCategoryReferenceFrame.SearchButton.scripts.OnClick()
+local sawCrystalVial = false
+for _, result in ipairs(
+    GuildBankOrganizerCategoryReferenceFrame.ResultList.Results
+) do
+    if result.itemID == 3371 then
+        sawCrystalVial = true
+    end
+    assert(result.name ~= "Test Sapper Charge")
+end
+assert(sawCrystalVial)
+
+GuildBankOrganizerCategoryReferenceFrame.SearchInput:SetText("23418")
+GuildBankOrganizerCategoryReferenceFrame.SearchButton.scripts.OnClick()
+assert(string.find(
+    GuildBankOrganizerCategoryReferenceFrame.ResultList.Text:GetText(),
+    "Excluded: internal test item",
+    1,
+    true
+))
+GuildBankOrganizerCategoryReferenceFrame.SearchInput:SetText("999999")
+GuildBankOrganizerCategoryReferenceFrame.SearchButton.scripts.OnClick()
+assert(
+    GuildBankOrganizerCategoryReferenceFrame.ResultList.Text:GetText()
+        == "No bundled MoP Classic profession item found."
+)
+
+GuildBankOrganizerCategoryReferenceFrame.SharedButton.scripts.OnClick()
+local sharedPageResults = GuildBankOrganizerCategoryReferenceFrame.ResultList.Results
+assert(#sharedPageResults == #expectedSharedIDs)
+local priorExpansionID = -1
+for _, result in ipairs(sharedPageResults) do
+    assert(result.expansionID >= priorExpansionID)
+    assert(string.find(result.line, result.expansionName, 1, true))
+    priorExpansionID = result.expansionID
+end
+GuildBankOrganizerCategoryReferenceFrame.BackButton.scripts.OnClick()
+assert(not GuildBankOrganizerCategoryReferenceFrame:IsShown())
+assert(GuildBankOrganizerAdvancedFrame:IsShown())
 GuildBankOrganizerAdvancedFrame.AutoButton.scripts.OnClick()
 runNextTimer()
 assert(GuildBankOrganizerAdvancedFrame.SourceInput:GetText() == "1")
@@ -1009,6 +1150,8 @@ runTimers()
 
 assert(not addon:IsDiagnosticRunning())
 assert(addon.lastReport and string.find(addon.lastReport, "result=PASS", 1, true))
+assert(string.find(addon.lastReport, "profileRecovery:", 1, true))
+assert(string.find(addon.lastReport, "Test Realm", 1, true))
 assert(slots[1][1] and slots[1][1].count == 20)
 assert(slots[1][2] == nil)
 assert(GuildBankOrganizerDB and #GuildBankOrganizerDB.runs == 1)

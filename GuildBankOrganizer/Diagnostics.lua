@@ -44,6 +44,71 @@ local function expectedReady()
     return true, nil, source, target
 end
 
+local function sortedKeys(value)
+    local keys = {}
+    for key in pairs(value) do
+        table.insert(keys, key)
+    end
+    table.sort(keys, function(left, right)
+        local leftText = type(left) .. ":" .. tostring(left)
+        local rightText = type(right) .. ":" .. tostring(right)
+        return leftText < rightText
+    end)
+    return keys
+end
+
+local function formatRecoveryValue(value, depth, visited)
+    if type(value) == "string" then
+        return string.format("%q", value)
+    elseif type(value) ~= "table" then
+        return tostring(value)
+    elseif visited[value] then
+        return "<cycle>"
+    elseif depth >= 4 then
+        return "<nested table>"
+    end
+
+    visited[value] = true
+    local fields = {}
+    for _, key in ipairs(sortedKeys(value)) do
+        table.insert(fields, string.format(
+            "[%s]=%s",
+            formatRecoveryValue(key, depth + 1, visited),
+            formatRecoveryValue(value[key], depth + 1, visited)
+        ))
+    end
+    visited[value] = nil
+    return "{" .. table.concat(fields, ",") .. "}"
+end
+
+local function appendProfileRecovery(lines)
+    local recovery = GBO:GetDepositProfileRecovery()
+    if not recovery then
+        return
+    end
+
+    table.insert(lines, "profileRecovery:")
+    for _, guildKey in ipairs(sortedKeys(recovery)) do
+        local guildRecovery = recovery[guildKey]
+        if type(guildRecovery) == "table" then
+            for _, tab in ipairs(sortedKeys(guildRecovery)) do
+                table.insert(lines, string.format(
+                    "guild=%q tab=%s value=%s",
+                    tostring(guildKey),
+                    tostring(tab),
+                    formatRecoveryValue(guildRecovery[tab], 0, {})
+                ))
+            end
+        else
+            table.insert(lines, string.format(
+                "guild=%q value=%s",
+                tostring(guildKey),
+                formatRecoveryValue(guildRecovery, 0, {})
+            ))
+        end
+    end
+end
+
 local function buildReport(ok, reason)
     local client = GBO.client or {}
     local lines = {
@@ -82,6 +147,7 @@ local function buildReport(ok, reason)
     for index = 1, #diagnostic.timeline do
         table.insert(lines, diagnostic.timeline[index])
     end
+    appendProfileRecovery(lines)
 
     return table.concat(lines, "\n"), {
         savedAt = GetServerTime(),

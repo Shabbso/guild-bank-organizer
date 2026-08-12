@@ -4,6 +4,7 @@ local unpack = unpack or table.unpack
 local organizerFrame
 local advancedFrame
 local depositSettingsFrame
+local categoryReferenceFrame
 local autoSelectGeneration = 0
 local autoSelectPending
 local refreshGeneration = 0
@@ -289,6 +290,24 @@ local function createPanel(name, width, height, title)
     end)
     frame.Close:SetPoint("TOPRIGHT", -4, -4)
     return frame
+end
+
+local function countProfileRecoveryEntries()
+    local recovery = GBO:GetDepositProfileRecovery()
+    if not recovery then
+        return 0
+    end
+    local count = 0
+    for _, guildRecovery in pairs(recovery) do
+        if type(guildRecovery) == "table" then
+            for _ in pairs(guildRecovery) do
+                count = count + 1
+            end
+        else
+            count = count + 1
+        end
+    end
+    return count
 end
 
 local function createProgressBar(parent)
@@ -779,6 +798,16 @@ function GBO:RefreshOrganizerUI()
             or (self.db and self.db.runs and self.db.runs[1] ~= nil))
         advancedFrame.AutoOpenCheck:SetChecked(self.db.settings.autoOpen)
         advancedFrame.ReverseCheck:SetChecked(self.db.settings.sortInverted)
+        local recoveryCount = countProfileRecoveryEntries()
+        if recoveryCount > 0 then
+            advancedFrame.RecoveryText:SetText(string.format(
+                "Recovered Smart Deposit data: %d quarantined entr%s. Normalized profiles route items; Copy Report includes recovery details.",
+                recoveryCount,
+                recoveryCount == 1 and "y" or "ies"
+            ))
+        else
+            advancedFrame.RecoveryText:SetText("")
+        end
 
         if depositing or depositScanning then
             advancedFrame.StatusText:SetText(self:GetDepositStatus())
@@ -825,8 +854,11 @@ local function scheduleRefresh()
         local advancedVisible = advancedFrame and advancedFrame:IsShown()
         local depositSettingsVisible =
             depositSettingsFrame and depositSettingsFrame:IsShown()
+        local categoryReferenceVisible =
+            categoryReferenceFrame and categoryReferenceFrame:IsShown()
         if refreshGeneration ~= generation
-            or not organizerVisible and not advancedVisible and not depositSettingsVisible
+            or not organizerVisible and not advancedVisible
+                and not depositSettingsVisible and not categoryReferenceVisible
         then
             return
         end
@@ -953,7 +985,10 @@ local function createOrganizerFrame()
 
     frame:SetScript("OnShow", scheduleRefresh)
     frame:SetScript("OnHide", function()
-        if not advancedFrame or not advancedFrame:IsShown() then
+        if (not advancedFrame or not advancedFrame:IsShown())
+            and (not depositSettingsFrame or not depositSettingsFrame:IsShown())
+            and (not categoryReferenceFrame or not categoryReferenceFrame:IsShown())
+        then
             refreshGeneration = refreshGeneration + 1
         end
     end)
@@ -965,7 +1000,7 @@ local function createAdvancedFrame()
     local frame = createPanel(
         "GuildBankOrganizerAdvancedFrame",
         470,
-        500,
+        550,
         "Guild Bank Organizer  /  Settings"
     )
     anchorBesideGuildBank(frame)
@@ -1018,45 +1053,67 @@ local function createAdvancedFrame()
     )
     frame.DepositSettingsButton:SetPoint("TOPLEFT", 360, -120)
 
+    frame.CategoryReferenceButton = createButton(
+        frame,
+        "Category Reference",
+        126,
+        24,
+        function()
+            GBO:ShowCategoryReferenceUI()
+        end
+    )
+    frame.CategoryReferenceButton:SetPoint("TOPLEFT", 330, -150)
+
     frame.SettingsText = frame:CreateFontString(nil, "OVERLAY", "GameFontHighlightSmall")
-    frame.SettingsText:SetPoint("TOPLEFT", 20, -154)
-    frame.SettingsText:SetPoint("TOPRIGHT", -20, -154)
+    frame.SettingsText:SetPoint("TOPLEFT", 20, -182)
+    frame.SettingsText:SetPoint("TOPRIGHT", -20, -182)
     frame.SettingsText:SetJustifyH("LEFT")
     frame.SettingsText:SetText("Normal bag-style ordering is enabled.")
 
-    createLabel(frame, "Diagnostics", 20, -188)
+    frame.RecoveryText = frame:CreateFontString(
+        nil,
+        "OVERLAY",
+        "GameFontNormalSmall"
+    )
+    frame.RecoveryText:SetPoint("TOPLEFT", 20, -202)
+    frame.RecoveryText:SetPoint("TOPRIGHT", -20, -202)
+    frame.RecoveryText:SetJustifyH("LEFT")
+    frame.RecoveryText:SetTextColor(unpack(COLORS.gold))
+    frame.RecoveryText:SetText("")
+
+    createLabel(frame, "Diagnostics", 20, -242)
 
     frame.TabText = frame:CreateFontString(nil, "OVERLAY", "GameFontNormal")
-    frame.TabText:SetPoint("TOPLEFT", 20, -214)
+    frame.TabText:SetPoint("TOPLEFT", 20, -268)
 
-    createLabel(frame, "Test source", 20, -247)
-    createLabel(frame, "Test empty", 130, -247)
-    createLabel(frame, "Test cadence", 240, -247)
-    createLabel(frame, "Moves", 350, -247)
+    createLabel(frame, "Test source", 20, -301)
+    createLabel(frame, "Test empty", 130, -301)
+    createLabel(frame, "Test cadence", 240, -301)
+    createLabel(frame, "Moves", 350, -301)
 
-    frame.SourceInput = createInput(frame, 70, 20, -267)
-    frame.EmptyInput = createInput(frame, 70, 130, -267)
-    frame.TestCadenceInput = createInput(frame, 70, 240, -267)
-    frame.MovesInput = createInput(frame, 70, 350, -267)
+    frame.SourceInput = createInput(frame, 70, 20, -321)
+    frame.EmptyInput = createInput(frame, 70, 130, -321)
+    frame.TestCadenceInput = createInput(frame, 70, 240, -321)
+    frame.MovesInput = createInput(frame, 70, 350, -321)
     frame.TestCadenceInput:SetText("1.25")
     frame.MovesInput:SetText("10")
     frame.SourceInput:SetScript("OnTextChanged", updateSelectionDescription)
     frame.EmptyInput:SetScript("OnTextChanged", updateSelectionDescription)
 
     frame.SelectionText = frame:CreateFontString(nil, "OVERLAY", "GameFontHighlightSmall")
-    frame.SelectionText:SetPoint("TOPLEFT", 20, -303)
-    frame.SelectionText:SetPoint("TOPRIGHT", -20, -303)
+    frame.SelectionText:SetPoint("TOPLEFT", 20, -357)
+    frame.SelectionText:SetPoint("TOPRIGHT", -20, -357)
     frame.SelectionText:SetJustifyH("LEFT")
     frame.SelectionText:SetText("Click Auto Select or enter source and empty slot numbers.")
 
     frame.ActionText = frame:CreateFontString(nil, "OVERLAY", "GameFontNormalSmall")
-    frame.ActionText:SetPoint("TOPLEFT", 20, -345)
-    frame.ActionText:SetPoint("TOPRIGHT", -20, -345)
+    frame.ActionText:SetPoint("TOPLEFT", 20, -399)
+    frame.ActionText:SetPoint("TOPRIGHT", -20, -399)
     frame.ActionText:SetJustifyH("LEFT")
     frame.ActionText:SetText("Use ordinary, replaceable items for movement diagnostics.")
 
     frame.AutoButton = createButton(frame, "Auto Select", 100, 24, beginAutoSelect)
-    frame.AutoButton:SetPoint("TOPLEFT", 20, -372)
+    frame.AutoButton:SetPoint("TOPLEFT", 20, -426)
 
     frame.ScanButton = createButton(frame, "Scan Tabs", 100, 24, function()
         GBO:StartScan()
@@ -1074,7 +1131,7 @@ local function createAdvancedFrame()
     frame.RunButton:SetPoint("LEFT", frame.SmokeButton, "RIGHT", 8, 0)
 
     frame.StopButton = createButton(frame, "Stop", 110, 24, stopCurrentOperation)
-    frame.StopButton:SetPoint("TOPLEFT", 20, -410)
+    frame.StopButton:SetPoint("TOPLEFT", 20, -464)
 
     frame.ReportButton = createButton(frame, "Copy Report", 110, 24, function()
         GBO:ShowReport()
@@ -1087,8 +1144,8 @@ local function createAdvancedFrame()
     helpButton:SetPoint("LEFT", frame.ReportButton, "RIGHT", 10, 0)
 
     frame.StatusText = frame:CreateFontString(nil, "OVERLAY", "GameFontHighlight")
-    frame.StatusText:SetPoint("TOPLEFT", 20, -452)
-    frame.StatusText:SetPoint("TOPRIGHT", -20, -452)
+    frame.StatusText:SetPoint("TOPLEFT", 20, -506)
+    frame.StatusText:SetPoint("TOPRIGHT", -20, -506)
     frame.StatusText:SetJustifyH("LEFT")
     frame.StatusText:SetText("Advanced diagnostics are ready.")
 
@@ -1101,8 +1158,177 @@ local function createAdvancedFrame()
     frame:SetScript("OnHide", function()
         autoSelectGeneration = autoSelectGeneration + 1
         autoSelectPending = nil
-        if not organizerFrame or not organizerFrame:IsShown() then
+        if (not organizerFrame or not organizerFrame:IsShown())
+            and (not depositSettingsFrame or not depositSettingsFrame:IsShown())
+            and (not categoryReferenceFrame or not categoryReferenceFrame:IsShown())
+        then
             refreshGeneration = refreshGeneration + 1
+        end
+    end)
+    frame:Hide()
+    return frame
+end
+
+local function createReferenceTextList(parent, x, y, width, height)
+    local scroll = CreateFrame(
+        "ScrollFrame",
+        nil,
+        parent,
+        "UIPanelScrollFrameTemplate"
+    )
+    scroll:SetPoint("TOPLEFT", x, y)
+    scroll:SetSize(width, height)
+
+    local child = CreateFrame("Frame", nil, scroll)
+    child:SetSize(width - 20, height)
+    child.Text = child:CreateFontString(nil, "OVERLAY", "GameFontHighlightSmall")
+    child.Text:SetPoint("TOPLEFT", 2, -2)
+    child.Text:SetWidth(width - 24)
+    child.Text:SetJustifyH("LEFT")
+    child.Text:SetText("")
+    child.Scroll = scroll
+    child.Results = {}
+    scroll:SetScrollChild(child)
+    return child
+end
+
+local function renderCategorySections(frame)
+    local sections = GBO:GetCategoryReferenceSections()
+    local lines = {}
+    for _, section in ipairs(sections) do
+        table.insert(lines, section.name)
+        table.insert(lines, section.description)
+        table.insert(lines, "Examples: " .. table.concat(section.examples, ", "))
+        table.insert(lines, "")
+    end
+    frame.CategoryList.Sections = sections
+    frame.CategoryList.Text:SetText(table.concat(lines, "\n"))
+    frame.CategoryList:SetHeight(math.max(500, (#lines * 16) + 8))
+    frame.CategoryList.Scroll:UpdateScrollChildRect()
+end
+
+local function formatReferenceLine(result)
+    if result.status == "unsupported" then
+        return result.statusText
+    end
+    local line = string.format(
+        "[%s] %s (#%d) — %s — %s",
+        tostring(result.expansionName or "Unknown expansion"),
+        tostring(result.name or "Unknown item"),
+        tonumber(result.itemID) or 0,
+        tostring(result.categoryName or "Not routed"),
+        tostring(result.statusText)
+    )
+    if result.evidence and result.status ~= "excluded" then
+        line = line .. " Evidence: " .. result.evidence
+    end
+    if result.exactRouteText then
+        line = line .. " " .. result.exactRouteText
+    end
+    return line
+end
+
+local function renderReferenceRecords(frame, records, groupByExpansion)
+    local results = {}
+    for index = 1, math.min(#records, 50) do
+        table.insert(
+            results,
+            GBO:FormatCategoryReferenceResult(records[index])
+        )
+    end
+    if groupByExpansion then
+        table.sort(results, function(left, right)
+            local leftExpansion = left.expansionID or math.huge
+            local rightExpansion = right.expansionID or math.huge
+            if leftExpansion ~= rightExpansion then
+                return leftExpansion < rightExpansion
+            elseif left.name ~= right.name then
+                return left.name < right.name
+            end
+            return (left.itemID or 0) < (right.itemID or 0)
+        end)
+    end
+
+    local lines = {}
+    for _, result in ipairs(results) do
+        result.line = formatReferenceLine(result)
+        table.insert(lines, result.line)
+    end
+    frame.ResultList.Results = results
+    frame.ResultList.Text:SetText(
+        #lines > 0
+            and table.concat(lines, "\n\n")
+            or "No bundled MoP Classic profession item found."
+    )
+    frame.ResultList:SetHeight(math.max(500, (#lines * 40) + 8))
+    frame.ResultList.Scroll:UpdateScrollChildRect()
+end
+
+local function searchCategoryReference(frame)
+    local query = string.match(frame.SearchInput:GetText() or "", "^%s*(.-)%s*$")
+    renderReferenceRecords(
+        frame,
+        GBO:SearchProfessionReference(query, 50),
+        false
+    )
+end
+
+local function createCategoryReferenceFrame()
+    local frame = createPanel(
+        "GuildBankOrganizerCategoryReferenceFrame",
+        470,
+        650,
+        "Guild Bank Organizer  /  Category Reference"
+    )
+    anchorBesideGuildBank(frame)
+    frame.Close:Hide()
+
+    frame.BackButton = createButton(frame, "< Back to Settings", 128, 22, function()
+        frame:Hide()
+        GBO:ShowAdvancedUI()
+    end)
+    frame.BackButton:SetPoint("TOPRIGHT", -4, -4)
+
+    frame.SearchInput = createInput(frame, 266, 16, -42)
+    frame.SearchInput:SetJustifyH("LEFT")
+    frame.SearchButton = createButton(frame, "Search", 72, 24, function()
+        searchCategoryReference(frame)
+    end)
+    frame.SearchButton:SetPoint("TOPLEFT", 290, -42)
+    frame.SharedButton = createButton(frame, "Shared List", 88, 24, function()
+        renderReferenceRecords(frame, GBO:GetSharedCraftingReagents(), true)
+    end)
+    frame.SharedButton:SetPoint("TOPLEFT", 366, -42)
+    frame.SearchInput:SetScript("OnEnterPressed", function(self)
+        self:ClearFocus()
+        searchCategoryReference(frame)
+    end)
+
+    local hint = frame:CreateFontString(nil, "OVERLAY", "GameFontHighlightSmall")
+    hint:SetPoint("TOPLEFT", 16, -72)
+    hint:SetPoint("TOPRIGHT", -16, -72)
+    hint:SetJustifyH("LEFT")
+    hint:SetText(
+        "Search bundled names or an exact item ID. Exact custom routes are annotated without changing the built-in category."
+    )
+
+    createLabel(frame, "Category definitions", 16, -106)
+    createLabel(frame, "Bundled lookup", 232, -106)
+    frame.CategoryList = createReferenceTextList(frame, 16, -124, 202, 506)
+    frame.ResultList = createReferenceTextList(frame, 232, -124, 222, 506)
+    frame.ResultList.Text:SetText("Search by item name or exact item ID, or open the complete Shared list.")
+
+    frame:SetScript("OnShow", function()
+        renderCategorySections(frame)
+        scheduleRefresh()
+    end)
+    frame:SetScript("OnHide", function()
+        if not organizerFrame or not organizerFrame:IsShown() then
+            if not advancedFrame or not advancedFrame:IsShown() then
+                if not depositSettingsFrame or not depositSettingsFrame:IsShown() then
+                    refreshGeneration = refreshGeneration + 1
+                end
+            end
         end
     end)
     frame:Hide()
@@ -1616,7 +1842,11 @@ local function createDepositSettingsFrame()
         end
         if not organizerFrame or not organizerFrame:IsShown() then
             if not advancedFrame or not advancedFrame:IsShown() then
+                if not categoryReferenceFrame
+                    or not categoryReferenceFrame:IsShown()
+                then
                 refreshGeneration = refreshGeneration + 1
+                end
             end
         end
     end)
@@ -1632,6 +1862,9 @@ function GBO:ShowOrganizerUI()
     if depositSettingsFrame then
         depositSettingsFrame:Hide()
     end
+    if categoryReferenceFrame then
+        categoryReferenceFrame:Hide()
+    end
     organizerFrame:Show()
     self:RefreshOrganizerUI()
 end
@@ -1643,6 +1876,9 @@ function GBO:ShowAdvancedUI()
     end
     if depositSettingsFrame then
         depositSettingsFrame:Hide()
+    end
+    if categoryReferenceFrame then
+        categoryReferenceFrame:Hide()
     end
     advancedFrame:Show()
     self:RefreshOrganizerUI()
@@ -1661,8 +1897,27 @@ function GBO:ShowDepositSettingsUI(tab)
     if advancedFrame then
         advancedFrame:Hide()
     end
+    if categoryReferenceFrame then
+        categoryReferenceFrame:Hide()
+    end
     depositSettingsFrame:Show()
     loadDepositSettings(tonumber(tab) or currentTab())
+    self:RefreshOrganizerUI()
+end
+
+function GBO:ShowCategoryReferenceUI()
+    categoryReferenceFrame =
+        categoryReferenceFrame or createCategoryReferenceFrame()
+    if organizerFrame then
+        organizerFrame:Hide()
+    end
+    if advancedFrame then
+        advancedFrame:Hide()
+    end
+    if depositSettingsFrame then
+        depositSettingsFrame:Hide()
+    end
+    categoryReferenceFrame:Show()
     self:RefreshOrganizerUI()
 end
 
@@ -1679,6 +1934,9 @@ function GBO:HideOrganizerUI()
     end
     if depositSettingsFrame then
         depositSettingsFrame:Hide()
+    end
+    if categoryReferenceFrame then
+        categoryReferenceFrame:Hide()
     end
 end
 
