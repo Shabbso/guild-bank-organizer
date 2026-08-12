@@ -172,7 +172,10 @@ local function addWidgetMethods(widget)
     widget.text = ""
     widget.scripts = widget.scripts or {}
 
-    function widget:SetSize() end
+    function widget:SetSize(width, height)
+        self.width = width
+        self.height = height
+    end
     function widget:SetPoint() end
     function widget:SetAllPoints() end
     function widget:SetFrameStrata() end
@@ -202,8 +205,12 @@ local function addWidgetMethods(widget)
     function widget:SetFontObject() end
     function widget:SetNormalFontObject() end
     function widget:SetTextColor() end
-    function widget:SetWidth() end
-    function widget:SetHeight() end
+    function widget:SetWidth(width)
+        self.width = width
+    end
+    function widget:SetHeight(height)
+        self.height = height
+    end
     function widget:SetTexture() end
     function widget:SetColorTexture(red, green, blue, alpha)
         self.color = { red, green, blue, alpha }
@@ -232,6 +239,9 @@ local function addWidgetMethods(widget)
     function widget:SetCursorPosition() end
     function widget:SetScrollChild() end
     function widget:UpdateScrollChildRect() end
+    function widget:SetVerticalScroll(offset)
+        self.verticalScroll = offset
+    end
     function widget:StartMoving() end
     function widget:StopMovingOrSizing() end
     function widget:Enable()
@@ -261,6 +271,20 @@ local function addWidgetMethods(widget)
     function widget:GetNumLines()
         local _, newlines = string.gsub(self.text, "\n", "\n")
         return newlines + 1
+    end
+    function widget:GetStringHeight()
+        local charactersPerLine = math.max(
+            1,
+            math.floor((self.width or 300) / 7)
+        )
+        local lineCount = 0
+        for line in string.gmatch(self.text .. "\n", "(.-)\n") do
+            lineCount = lineCount + math.max(
+                1,
+                math.ceil(string.len(line) / charactersPerLine)
+            )
+        end
+        return lineCount * 14
     end
     function widget:SetScript(script, callback)
         self.scripts[script] = callback
@@ -1092,9 +1116,19 @@ assert(GuildBankOrganizerCategoryReferenceFrame.CategoryList)
 assert(GuildBankOrganizerCategoryReferenceFrame.ResultList)
 assert(GuildBankOrganizerCategoryReferenceFrame.SharedButton)
 assert(GuildBankOrganizerCategoryReferenceFrame.BackButton)
+assert(
+    GuildBankOrganizerCategoryReferenceFrame.CategoryList.height
+        >= GuildBankOrganizerCategoryReferenceFrame.CategoryList.Text:GetStringHeight()
+            + 8
+)
 
 GuildBankOrganizerCategoryReferenceFrame.SearchInput:SetText("vial")
+GuildBankOrganizerCategoryReferenceFrame.ResultList.Scroll:SetVerticalScroll(123)
 GuildBankOrganizerCategoryReferenceFrame.SearchButton.scripts.OnClick()
+assert(
+    GuildBankOrganizerCategoryReferenceFrame.ResultList.Scroll.verticalScroll
+        == 0
+)
 local sawCrystalVial = false
 for _, result in ipairs(
     GuildBankOrganizerCategoryReferenceFrame.ResultList.Results
@@ -1105,6 +1139,55 @@ for _, result in ipairs(
     assert(result.name ~= "Test Sapper Charge")
 end
 assert(sawCrystalVial)
+assert(string.find(
+    GuildBankOrganizerCategoryReferenceFrame.ResultList.Text:GetText(),
+    "Classic Herbs",
+    1,
+    true
+))
+
+GuildBankOrganizerCategoryReferenceFrame.BackButton.scripts.OnClick()
+assert(addon:SaveDepositProfileDraft(1, {
+    enabled = true,
+    label = "Renamed Vial Destination",
+    categories = { herbs = true },
+    allExpansions = false,
+    expansions = { [0] = true },
+    exactItemIDs = { [3371] = true },
+}))
+GuildBankOrganizerAdvancedFrame.CategoryReferenceButton.scripts.OnClick()
+assert(string.find(
+    GuildBankOrganizerCategoryReferenceFrame.ResultList.Text:GetText(),
+    "Renamed Vial Destination",
+    1,
+    true
+))
+GuildBankOrganizerCategoryReferenceFrame.BackButton.scripts.OnClick()
+assert(addon:SaveDepositProfileDraft(1, {
+    enabled = true,
+    label = "Classic Herbs",
+    categories = { herbs = true },
+    allExpansions = false,
+    expansions = { [0] = true },
+    exactItemIDs = {},
+}))
+GuildBankOrganizerAdvancedFrame.CategoryReferenceButton.scripts.OnClick()
+assert(not string.find(
+    GuildBankOrganizerCategoryReferenceFrame.ResultList.Text:GetText(),
+    "Custom exact-ID destination",
+    1,
+    true
+))
+GuildBankOrganizerCategoryReferenceFrame.BackButton.scripts.OnClick()
+assert(addon:SaveDepositProfileDraft(1, {
+    enabled = true,
+    label = "Classic Herbs",
+    categories = { herbs = true },
+    allExpansions = false,
+    expansions = { [0] = true },
+    exactItemIDs = { [3371] = true },
+}))
+GuildBankOrganizerAdvancedFrame.CategoryReferenceButton.scripts.OnClick()
 
 GuildBankOrganizerCategoryReferenceFrame.SearchInput:SetText("23418")
 GuildBankOrganizerCategoryReferenceFrame.SearchButton.scripts.OnClick()
@@ -1121,9 +1204,20 @@ assert(
         == "No bundled MoP Classic profession item found."
 )
 
+GuildBankOrganizerCategoryReferenceFrame.ResultList.Scroll:SetVerticalScroll(321)
 GuildBankOrganizerCategoryReferenceFrame.SharedButton.scripts.OnClick()
+assert(
+    GuildBankOrganizerCategoryReferenceFrame.ResultList.Scroll.verticalScroll
+        == 0
+)
 local sharedPageResults = GuildBankOrganizerCategoryReferenceFrame.ResultList.Results
 assert(#sharedPageResults == #expectedSharedIDs)
+assert(
+    GuildBankOrganizerCategoryReferenceFrame.ResultList.height
+        >= GuildBankOrganizerCategoryReferenceFrame.ResultList.Text:GetStringHeight()
+            + 8
+)
+assert(GuildBankOrganizerCategoryReferenceFrame.ResultList.height > 768)
 local priorExpansionID = -1
 for _, result in ipairs(sharedPageResults) do
     assert(result.expansionID >= priorExpansionID)
@@ -1133,8 +1227,46 @@ end
 GuildBankOrganizerCategoryReferenceFrame.BackButton.scripts.OnClick()
 assert(not GuildBankOrganizerCategoryReferenceFrame:IsShown())
 assert(GuildBankOrganizerAdvancedFrame:IsShown())
+assert(addon:SaveDepositProfileDraft(1, {
+    enabled = true,
+    label = "Classic Herbs",
+    categories = { herbs = true },
+    allExpansions = false,
+    expansions = { [0] = true },
+    exactItemIDs = { [3371] = true, [4402] = true },
+}))
+GuildBankOrganizerAdvancedFrame.CategoryReferenceButton.scripts.OnClick()
+assert(string.find(
+    GuildBankOrganizerCategoryReferenceFrame.ResultList.Text:GetText(),
+    "Small Flame Sac",
+    1,
+    true
+))
+assert(string.find(
+    GuildBankOrganizerCategoryReferenceFrame.ResultList.Text:GetText(),
+    "Custom exact-ID destination: Tab 1 (Classic Herbs)",
+    1,
+    true
+))
+GuildBankOrganizerCategoryReferenceFrame.BackButton.scripts.OnClick()
+assert(addon:SaveDepositProfileDraft(1, {
+    enabled = true,
+    label = "Classic Herbs",
+    categories = { herbs = true },
+    allExpansions = false,
+    expansions = { [0] = true },
+    exactItemIDs = { [3371] = true },
+}))
+while addon:IsDepositScanning() do
+    runNextTimer()
+end
 GuildBankOrganizerAdvancedFrame.AutoButton.scripts.OnClick()
-runNextTimer()
+for _ = 1, 20 do
+    if GuildBankOrganizerAdvancedFrame.SourceInput:GetText() == "1" then
+        break
+    end
+    runNextTimer()
+end
 assert(GuildBankOrganizerAdvancedFrame.SourceInput:GetText() == "1")
 assert(GuildBankOrganizerAdvancedFrame.EmptyInput:GetText() == "98")
 addon:HideOrganizerUI()
@@ -1145,6 +1277,8 @@ runTimers()
 assert(addon.lastScan)
 assert(addon.lastScan.tabs[1].occupied == 1)
 
+addon:GetDepositProfileRecovery()["Test Realm\031Test Guild"]["line\nbreak"] =
+    "malformed string-key fixture"
 assert(addon:StartDiagnostic(1, 1, 2, 1.50, 2))
 runTimers()
 
@@ -1152,6 +1286,8 @@ assert(not addon:IsDiagnosticRunning())
 assert(addon.lastReport and string.find(addon.lastReport, "result=PASS", 1, true))
 assert(string.find(addon.lastReport, "profileRecovery:", 1, true))
 assert(string.find(addon.lastReport, "Test Realm", 1, true))
+assert(string.find(addon.lastReport, 'tab="line\\nbreak"', 1, true))
+assert(not string.find(addon.lastReport, "tab=line\nbreak", 1, true))
 assert(slots[1][1] and slots[1][1].count == 20)
 assert(slots[1][2] == nil)
 assert(GuildBankOrganizerDB and #GuildBankOrganizerDB.runs == 1)

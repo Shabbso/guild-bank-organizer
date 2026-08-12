@@ -57,9 +57,21 @@ local function sortedKeys(value)
     return keys
 end
 
+local function quoteRecoveryString(value)
+    local escaped = string.gsub(value, "\\", "\\\\")
+    escaped = string.gsub(escaped, '"', '\\"')
+    escaped = string.gsub(escaped, "\n", "\\n")
+    escaped = string.gsub(escaped, "\r", "\\r")
+    escaped = string.gsub(escaped, "\t", "\\t")
+    escaped = string.gsub(escaped, "%c", function(character)
+        return string.format("\\%03d", string.byte(character))
+    end)
+    return '"' .. escaped .. '"'
+end
+
 local function formatRecoveryValue(value, depth, visited)
     if type(value) == "string" then
-        return string.format("%q", value)
+        return quoteRecoveryString(value)
     elseif type(value) ~= "table" then
         return tostring(value)
     elseif visited[value] then
@@ -93,16 +105,16 @@ local function appendProfileRecovery(lines)
         if type(guildRecovery) == "table" then
             for _, tab in ipairs(sortedKeys(guildRecovery)) do
                 table.insert(lines, string.format(
-                    "guild=%q tab=%s value=%s",
-                    tostring(guildKey),
-                    tostring(tab),
+                    "guild=%s tab=%s value=%s",
+                    formatRecoveryValue(guildKey, 0, {}),
+                    formatRecoveryValue(tab, 0, {}),
                     formatRecoveryValue(guildRecovery[tab], 0, {})
                 ))
             end
         else
             table.insert(lines, string.format(
-                "guild=%q value=%s",
-                tostring(guildKey),
+                "guild=%s value=%s",
+                formatRecoveryValue(guildKey, 0, {}),
                 formatRecoveryValue(guildRecovery, 0, {})
             ))
         end

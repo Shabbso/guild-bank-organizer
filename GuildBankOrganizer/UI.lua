@@ -1188,8 +1188,20 @@ local function createReferenceTextList(parent, x, y, width, height)
     child.Text:SetText("")
     child.Scroll = scroll
     child.Results = {}
+    child.MinimumHeight = height
     scroll:SetScrollChild(child)
     return child
+end
+
+local function sizeReferenceTextList(list, resetScroll)
+    list:SetHeight(math.max(
+        list.MinimumHeight,
+        math.ceil(list.Text:GetStringHeight() or 0) + 8
+    ))
+    list.Scroll:UpdateScrollChildRect()
+    if resetScroll then
+        list.Scroll:SetVerticalScroll(0)
+    end
 end
 
 local function renderCategorySections(frame)
@@ -1203,8 +1215,7 @@ local function renderCategorySections(frame)
     end
     frame.CategoryList.Sections = sections
     frame.CategoryList.Text:SetText(table.concat(lines, "\n"))
-    frame.CategoryList:SetHeight(math.max(500, (#lines * 16) + 8))
-    frame.CategoryList.Scroll:UpdateScrollChildRect()
+    sizeReferenceTextList(frame.CategoryList, false)
 end
 
 local function formatReferenceLine(result)
@@ -1260,17 +1271,43 @@ local function renderReferenceRecords(frame, records, groupByExpansion)
             and table.concat(lines, "\n\n")
             or "No bundled MoP Classic profession item found."
     )
-    frame.ResultList:SetHeight(math.max(500, (#lines * 40) + 8))
-    frame.ResultList.Scroll:UpdateScrollChildRect()
+    sizeReferenceTextList(frame.ResultList, true)
 end
 
 local function searchCategoryReference(frame)
     local query = string.match(frame.SearchInput:GetText() or "", "^%s*(.-)%s*$")
+    frame.ResultMode = "search"
+    frame.ResultQuery = query
     renderReferenceRecords(
         frame,
         GBO:SearchProfessionReference(query, 50),
         false
     )
+end
+
+local function showSharedCategoryReference(frame)
+    frame.ResultMode = "shared"
+    frame.ResultQuery = nil
+    renderReferenceRecords(frame, GBO:GetSharedCraftingReagents(), true)
+end
+
+local function refreshCategoryReferenceResults(frame)
+    if frame.ResultMode == "search" then
+        frame.SearchInput:SetText(frame.ResultQuery or "")
+        renderReferenceRecords(
+            frame,
+            GBO:SearchProfessionReference(frame.ResultQuery or "", 50),
+            false
+        )
+    elseif frame.ResultMode == "shared" then
+        renderReferenceRecords(frame, GBO:GetSharedCraftingReagents(), true)
+    else
+        frame.ResultList.Results = {}
+        frame.ResultList.Text:SetText(
+            "Search by item name or exact item ID, or open the complete Shared list."
+        )
+        sizeReferenceTextList(frame.ResultList, true)
+    end
 end
 
 local function createCategoryReferenceFrame()
@@ -1296,7 +1333,7 @@ local function createCategoryReferenceFrame()
     end)
     frame.SearchButton:SetPoint("TOPLEFT", 290, -42)
     frame.SharedButton = createButton(frame, "Shared List", 88, 24, function()
-        renderReferenceRecords(frame, GBO:GetSharedCraftingReagents(), true)
+        showSharedCategoryReference(frame)
     end)
     frame.SharedButton:SetPoint("TOPLEFT", 366, -42)
     frame.SearchInput:SetScript("OnEnterPressed", function(self)
@@ -1316,10 +1353,10 @@ local function createCategoryReferenceFrame()
     createLabel(frame, "Bundled lookup", 232, -106)
     frame.CategoryList = createReferenceTextList(frame, 16, -124, 202, 506)
     frame.ResultList = createReferenceTextList(frame, 232, -124, 222, 506)
-    frame.ResultList.Text:SetText("Search by item name or exact item ID, or open the complete Shared list.")
 
     frame:SetScript("OnShow", function()
         renderCategorySections(frame)
+        refreshCategoryReferenceResults(frame)
         scheduleRefresh()
     end)
     frame:SetScript("OnHide", function()
