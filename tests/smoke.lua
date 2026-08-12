@@ -1108,6 +1108,14 @@ addon:ShowDepositSettingsUI()
 local depositSettings = GuildBankOrganizerDepositSettingsFrame
 assert(depositSettings.EnabledCheck:GetChecked())
 assert(depositSettings.SaveButton:GetText() == "Save Now")
+assert(depositSettings.SaveState == "new")
+assert(string.find(
+    depositSettings.StatusText:GetText(),
+    "Choose a category or exact item ID",
+    1,
+    true
+))
+assert(addon:GetDepositProfile(1, false) == nil)
 
 local uncheckedCloth = depositSettings.CategoryChecks.cloth
 assert(uncheckedCloth.Top and uncheckedCloth.Top:IsShown())

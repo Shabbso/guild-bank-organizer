@@ -1167,10 +1167,17 @@ loadDepositSettings = function(tab)
         table.insert(exactText, tostring(itemID))
     end
     depositSettingsFrame.ExactItemsInput:SetText(table.concat(exactText, ", "))
-    setDepositSaveState(
-        "saved",
-        "All changes saved. Hover a category to see its rule."
-    )
+    if profile then
+        setDepositSaveState(
+            "saved",
+            "All changes saved. Hover a category to see its rule."
+        )
+    else
+        setDepositSaveState(
+            "new",
+            "Choose a category or exact item ID to create this profile."
+        )
+    end
     depositSettingsFrame.LoadingProfile = false
 end
 
