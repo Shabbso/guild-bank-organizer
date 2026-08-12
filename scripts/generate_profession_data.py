@@ -18,6 +18,19 @@ from collections import Counter, defaultdict
 from dataclasses import dataclass, field
 from pathlib import Path
 
+try:
+    from scripts.profession_taxonomy import (
+        CURATED_CATEGORY_BY_ITEM,
+        EXCLUDED_ITEM_REASONS,
+        SHARED_ITEM_IDS,
+    )
+except ModuleNotFoundError:
+    from profession_taxonomy import (
+        CURATED_CATEGORY_BY_ITEM,
+        EXCLUDED_ITEM_REASONS,
+        SHARED_ITEM_IDS,
+    )
+
 
 SOURCE_BUILD = "5.5.4.68806"
 SOURCE_TABLES = (
@@ -170,6 +183,33 @@ class GeneratedCategory:
     owners: tuple[str, ...]
 
 
+def apply_taxonomy_policy(
+    item_id: int,
+    generated: GeneratedCategory,
+) -> GeneratedCategory | None:
+    if item_id in EXCLUDED_ITEM_REASONS:
+        return None
+    curated = CURATED_CATEGORY_BY_ITEM.get(item_id)
+    if curated:
+        return GeneratedCategory(
+            curated,
+            "curated player-facing category",
+            generated.owners,
+        )
+    if item_id in SHARED_ITEM_IDS:
+        return GeneratedCategory(
+            "profession_supplies",
+            "curated shared crafting reagent",
+            generated.owners,
+        )
+    if generated.category == "profession_supplies":
+        raise RuntimeError(
+            f"multi-owner item {item_id} requires a curated category, "
+            "Shared allowlist entry, or exclusion"
+        )
+    return generated
+
+
 def integer(row: dict[str, str], key: str) -> int:
     return int(row.get(key) or 0)
 
@@ -257,7 +297,7 @@ def intrinsic_category(item_id: int, item: dict[str, str]) -> str | None:
     if class_id == ITEM_CLASS["consumable"] and subclass_id == 7:
         return "first_aid"
     if class_id == ITEM_CLASS["recipe"]:
-        return RECIPE_CATEGORY.get(subclass_id, "profession_supplies")
+        return RECIPE_CATEGORY.get(subclass_id)
     return None
 
 
@@ -396,6 +436,8 @@ def build_catalog(sources: dict[str, list[dict[str, str]]]):
     generated: dict[int, GeneratedCategory] = {}
     classifications: dict[int, str] = {}
     classification_source: dict[int, str] = {}
+    classification_origin: dict[int, str] = {}
+    reference: dict[int, dict[str, str | int | None]] = {}
     excluded = Counter()
     missing_records = []
 
@@ -411,27 +453,52 @@ def build_catalog(sources: dict[str, list[dict[str, str]]]):
             excluded[reason or "statically ineligible"] += 1
             continue
 
+        item_roles = roles.get(item_id, Roles())
         category = intrinsic_category(item_id, item)
+        intrinsic = category is not None
         if category:
-            classifications[item_id] = category
-            classification_source[item_id] = "intrinsic item metadata"
-            continue
-
-        if item_id in ARCHAEOLOGY_ITEM_IDS:
+            result = GeneratedCategory(
+                category,
+                "intrinsic item metadata",
+                tuple(sorted(item_roles.reagent | item_roles.product)),
+            )
+        elif item_id in ARCHAEOLOGY_ITEM_IDS:
             result = GeneratedCategory(
                 "archaeology",
                 "MoP archaeology keystone data",
                 ("archaeology",),
             )
-            generated[item_id] = result
-            classifications[item_id] = result.category
-            classification_source[item_id] = result.reason
+        else:
+            result = generated_category(item_sparse, item_roles)
+
+        final = apply_taxonomy_policy(item_id, result)
+        name = (item_sparse.get("Display_lang") or "Unnamed item").replace(
+            "\r", " "
+        ).replace("\n", " ")
+        if final is None:
+            reason = EXCLUDED_ITEM_REASONS[item_id]
+            excluded[f"reviewed: {reason}"] += 1
+            reference[item_id] = {
+                "item_id": item_id,
+                "name": name,
+                "category": None,
+                "evidence": reason,
+                "status": "excluded",
+            }
             continue
 
-        result = generated_category(item_sparse, roles.get(item_id, Roles()))
-        generated[item_id] = result
-        classifications[item_id] = result.category
-        classification_source[item_id] = result.reason
+        if not intrinsic or final != result:
+            generated[item_id] = final
+        classifications[item_id] = final.category
+        classification_source[item_id] = final.reason
+        classification_origin[item_id] = "Intrinsic" if intrinsic else "Generated"
+        reference[item_id] = {
+            "item_id": item_id,
+            "name": name,
+            "category": final.category,
+            "evidence": final.reason,
+            "status": "public",
+        }
 
     unclassified = [
         item_id for item_id in classifications if not classifications[item_id]
@@ -443,9 +510,12 @@ def build_catalog(sources: dict[str, list[dict[str, str]]]):
 
     sentinels = {
         2581: "first_aid",       # Heavy Linen Bandage
-        3371: "profession_supplies",  # Crystal Vial
+        3371: "alchemy",          # Crystal Vial
         4359: "engineering",     # Handful of Copper Bolts
         4408: "engineering",     # Mechanical Squirrel schematic
+        37602: "enchanting",      # Ruined Vellum
+        39354: "inscription",     # Light Parchment
+        52078: "profession_supplies",  # Chaos Orb
         79251: "inscription",    # Shadow Pigment
         79254: "inscription",    # Ink of Dreams
         79868: "archaeology",    # Pandaren Pottery Shard
@@ -457,6 +527,8 @@ def build_catalog(sources: dict[str, list[dict[str, str]]]):
                 f"source validation failed for item {item_id}: "
                 f"{actual!r} != {expected!r}"
             )
+    if reference.get(23418, {}).get("status") != "excluded":
+        raise RuntimeError("source validation failed for item 23418: expected excluded")
 
     return {
         "items": items,
@@ -465,6 +537,8 @@ def build_catalog(sources: dict[str, list[dict[str, str]]]):
         "generated": generated,
         "classifications": classifications,
         "classification_source": classification_source,
+        "classification_origin": classification_origin,
+        "reference": reference,
         "excluded": excluded,
         "missing_records": missing_records,
         "connected_count": connected_count,
@@ -478,6 +552,11 @@ def lua_quote(value: str) -> str:
 
 def render_lua(catalog) -> str:
     generated = catalog["generated"]
+    reference = catalog["reference"]
+    shared_item_ids = [
+        item_id for item_id in sorted(SHARED_ITEM_IDS)
+        if reference.get(item_id, {}).get("status") == "public"
+    ]
     category_counts = Counter(value.category for value in generated.values())
     lines = [
         "local _, GBO = ...",
@@ -487,8 +566,21 @@ def render_lua(catalog) -> str:
         f"-- Source build: {SOURCE_BUILD}",
         "-- Values cover profession-connected items that broad item metadata cannot",
         "-- classify. Intrinsic Armor, Cloth, Ore, Leather, and similar rules win first.",
-        "local professionCategories = {",
+        "local curatedCategories = {",
     ]
+    for item_id in sorted(CURATED_CATEGORY_BY_ITEM):
+        lines.append(
+            f"    [{item_id}] = {lua_quote(CURATED_CATEGORY_BY_ITEM[item_id])},"
+        )
+    for item_id in sorted(EXCLUDED_ITEM_REASONS):
+        lines.append(f"    [{item_id}] = false,")
+    lines.extend(
+        [
+            "}",
+            "",
+        "local professionCategories = {",
+        ]
+    )
     for item_id in sorted(generated):
         entry = generated[item_id]
         name = (
@@ -497,6 +589,25 @@ def render_lua(catalog) -> str:
         lines.append(
             f"    [{item_id}] = {lua_quote(entry.category)}, -- {name}"
         )
+    lines.extend(["}", "", "local professionReference = {"])
+    for item_id in sorted(reference):
+        record = reference[item_id]
+        category = record["category"]
+        category_key = "nil" if category is None else lua_quote(str(category))
+        lines.extend(
+            [
+                f"    [{item_id}] = {{",
+                f"        itemID = {item_id},",
+                f"        name = {lua_quote(str(record['name']))},",
+                f"        categoryKey = {category_key},",
+                f"        evidence = {lua_quote(str(record['evidence']))},",
+                f"        status = {lua_quote(str(record['status']))},",
+                "    },",
+            ]
+        )
+    lines.extend(["}", "", "local sharedCraftingReagents = {"])
+    for item_id in shared_item_ids:
+        lines.append(f"    {item_id},")
     lines.extend(
         [
             "}",
@@ -520,8 +631,53 @@ def render_lua(catalog) -> str:
             "    },",
             "}",
             "",
+            "function GBO:GetCuratedProfessionCategory(itemID)",
+            "    local category = curatedCategories[tonumber(itemID)]",
+            "    return category, category ~= nil",
+            "end",
+            "",
             "function GBO:GetGeneratedProfessionCategory(itemID)",
             "    return professionCategories[tonumber(itemID)]",
+            "end",
+            "",
+            "function GBO:GetProfessionReferenceItem(itemID)",
+            "    return professionReference[tonumber(itemID)]",
+            "end",
+            "",
+            "function GBO:SearchProfessionReference(query, limit)",
+            "    query = string.lower(tostring(query or \"\"))",
+            "    limit = math.max(1, math.min(tonumber(limit) or 25, 50))",
+            "    if string.match(query, \"^%d+$\") then",
+            "        local record = professionReference[tonumber(query)]",
+            "        return record and { record } or {}",
+            "    end",
+            "",
+            "    local results = {}",
+            "    for _, record in pairs(professionReference) do",
+            "        if record.status == \"public\" and string.find(",
+            "            string.lower(record.name), query, 1, true",
+            "        ) then",
+            "            table.insert(results, record)",
+            "        end",
+            "    end",
+            "    table.sort(results, function(left, right)",
+            "        if left.name == right.name then",
+            "            return left.itemID < right.itemID",
+            "        end",
+            "        return left.name < right.name",
+            "    end)",
+            "    for index = #results, limit + 1, -1 do",
+            "        table.remove(results, index)",
+            "    end",
+            "    return results",
+            "end",
+            "",
+            "function GBO:GetSharedCraftingReagents()",
+            "    local results = {}",
+            "    for _, itemID in ipairs(sharedCraftingReagents) do",
+            "        table.insert(results, professionReference[itemID])",
+            "    end",
+            "    return results",
             "end",
             "",
             "function GBO:GetProfessionCoverageSummary()",
@@ -540,16 +696,21 @@ def markdown_escape(value: str) -> str:
 def render_report(catalog) -> str:
     generated = catalog["generated"]
     classifications = catalog["classifications"]
-    sources = catalog["classification_source"]
+    origins = catalog["classification_origin"]
+    reference = catalog["reference"]
     sparse = catalog["sparse"]
     category_counts: dict[str, Counter] = defaultdict(Counter)
     for item_id, category in classifications.items():
-        source = "Generated" if item_id in generated else "Intrinsic"
+        source = origins[item_id]
         category_counts[category][source] += 1
 
     shared = [
-        item_id for item_id, value in generated.items()
-        if value.category == "profession_supplies"
+        item_id for item_id in sorted(SHARED_ITEM_IDS)
+        if reference.get(item_id, {}).get("status") == "public"
+    ]
+    reviewed_exclusions = [
+        item_id for item_id in sorted(EXCLUDED_ITEM_REASONS)
+        if reference.get(item_id, {}).get("status") == "excluded"
     ]
 
     lines = [
@@ -563,9 +724,9 @@ def render_report(catalog) -> str:
         f"- Client build: `{SOURCE_BUILD}`",
         f"- Profession recipe-graph item records: **{catalog['connected_count']:,}**",
         f"- Total recipe-graph, direct-metadata, and Archaeology candidates: **{catalog['candidate_count']:,}**",
-        f"- Statically guild-bank-eligible records: **{len(classifications):,}**",
-        f"- Resolved by intrinsic item metadata: **{len(classifications) - len(generated):,}**",
-        f"- Resolved by generated profession data: **{len(generated):,}**",
+        f"- Public guild-bank-eligible records: **{len(classifications):,}**",
+        f"- Resolved by intrinsic item metadata: **{sum(value == 'Intrinsic' for value in origins.values()):,}**",
+        f"- Resolved by generated profession data: **{sum(value == 'Generated' for value in origins.values()):,}**",
         "- Eligible records without an organizational category: **0**",
         "",
         "Static eligibility excludes bind-on-pickup, quest-bound, Quest-class, and",
@@ -590,11 +751,12 @@ def render_report(catalog) -> str:
     lines.extend(
         [
             "",
-            "## Shared profession supplies",
+            "## Shared Crafting Reagents",
             "",
-            "These items have more than one defensible profession owner and no",
-            "stronger intrinsic category. They deliberately route through one",
-            "neutral category instead of being duplicated across tab profiles.",
+            "These reviewed allowlist entries deliberately route through one neutral",
+            "category instead of being duplicated across tab profiles. Any new",
+            "multi-owner candidate stops generation until it receives a curated category,",
+            "Shared allowlist entry, or exclusion.",
             "",
             "| Item ID | Item | Profession evidence |",
             "| ---: | --- | --- |",
@@ -602,10 +764,30 @@ def render_report(catalog) -> str:
     )
     for item_id in shared:
         name = markdown_escape(sparse[item_id].get("Display_lang") or "Unnamed item")
-        owners = ", ".join(generated[item_id].owners)
+        item_roles = catalog["roles"].get(item_id, Roles())
+        owners = ", ".join(sorted(item_roles.reagent | item_roles.product))
         if not owners:
             owners = "specialized bag or direct item metadata"
         lines.append(f"| {item_id} | {name} | {owners} |")
+
+    lines.extend(
+        [
+            "",
+            "## Excluded reviewed records",
+            "",
+            "These exact IDs remain in the reference catalog for diagnostics but are",
+            "not public routing choices.",
+            "",
+            "| Item ID | Item | Exclusion reason |",
+            "| ---: | --- | --- |",
+        ]
+    )
+    for item_id in reviewed_exclusions:
+        record = reference[item_id]
+        lines.append(
+            f"| {item_id} | {markdown_escape(str(record['name']))} | "
+            f"{markdown_escape(str(record['evidence']))} |"
+        )
 
     lines.extend(
         [
@@ -618,10 +800,10 @@ def render_report(catalog) -> str:
             "  the profession graph supports it. Fishing-family items are kept in",
             "  Fish & Cooking because fishing itself has no crafting recipe graph.",
             "- A unique crafted-product category wins next, followed by a unique",
-            "  profession category. Truly multi-profession leftovers become Shared",
-            "  Profession Supplies.",
-            "- Client data includes deprecated and internal records. Classifying an",
-            "  unreachable record is harmless; it does not make that item obtainable.",
+            "  profession category. Multi-profession leftovers require reviewed",
+            "  policy rather than becoming implicit Shared routing choices.",
+            "- Client data includes deprecated and internal records. The reviewed",
+            "  exclusions stay searchable by exact item ID without being suggested.",
             "- Coverage is for items connected to professions present in this client,",
             "  not every quest token, cosmetic, or miscellaneous object in the game.",
             "",
@@ -673,7 +855,8 @@ def main() -> None:
     args.report_output.write_text(render_report(catalog), encoding="utf-8")
     print(
         f"wrote {args.lua_output} with {len(catalog['generated'])} generated items; "
-        f"coverage {len(catalog['classifications'])}/{len(catalog['classifications'])}"
+        f"coverage {len(catalog['classifications'])}/{len(catalog['classifications'])}; "
+        "unreviewed multi-owner items 0"
     )
     print(f"wrote {args.report_output}")
 

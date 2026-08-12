@@ -610,7 +610,7 @@ assert(addon:ClassifyDepositItem({
     classID = 7,
     subclassID = 11,
     bagFamily = 16,
-}) == "profession_supplies")
+}) == "alchemy")
 assert(addon:ClassifyDepositItem({
     itemID = 79868,
     classID = 7,
