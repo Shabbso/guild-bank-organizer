@@ -710,6 +710,9 @@ fire("PLAYER_LOGIN")
 fire("GUILDBANKFRAME_OPENED")
 
 assert(GuildBankOrganizerFrame:IsShown())
+assert(GuildBankOrganizerFrame.DepositCurrentButton:GetText() == "Deposit This Tab")
+assert(GuildBankOrganizerFrame.DepositAllButton:GetText() == "Deposit All Tabs")
+assert(not GuildBankOrganizerFrame.DepositStopButton:IsShown())
 addon:ShowTestUI()
 GuildBankOrganizerAdvancedFrame.AutoButton.scripts.OnClick()
 runNextTimer()
@@ -922,8 +925,70 @@ assert(allScope.totalItems == 22)
 assert(allScope.totalMoves == 3)
 assert(allScope.destinationCount == 2)
 
-assert(addon:StartDeposit(1))
+addon:ShowOrganizerUI()
+local organizer = GuildBankOrganizerFrame
+addon:RefreshOrganizerUI()
+assert(string.find(
+    organizer.SmartHint:GetText(),
+    "This tab: 15 items in 2 deposits",
+    1,
+    true
+))
+assert(string.find(
+    organizer.SmartHint:GetText(),
+    "All configured tabs: 22 items in 3 deposits across 2 tabs",
+    1,
+    true
+))
+assert(organizer.DepositCurrentButton:IsEnabled())
+assert(organizer.DepositAllButton:IsEnabled())
+
+local originalStartDeposit = addon.StartDeposit
+local requestedScopes = {}
+addon.StartDeposit = function(_, tab)
+    table.insert(requestedScopes, tab or "all")
+    return true
+end
+organizer.DepositCurrentButton.scripts.OnClick()
+organizer.DepositAllButton.scripts.OnClick()
+addon.StartDeposit = originalStartDeposit
+assert(requestedScopes[1] == currentGuildBankTab)
+assert(requestedScopes[2] == "all")
+
+currentGuildBankTab = 2
+bags[0][2] = nil
+assert(addon:RefreshDepositPlan())
+organizer:Hide()
 runTimers()
+addon:RefreshOrganizerUI()
+assert(not organizer.DepositCurrentButton:IsEnabled())
+assert(organizer.DepositAllButton:IsEnabled())
+assert(string.find(
+    organizer.SmartHint:GetText(),
+    "This tab: No matching items",
+    1,
+    true
+))
+
+currentGuildBankTab = 1
+bags[0][2] = makeItem(500, 7)
+assert(addon:RefreshDepositPlan())
+runTimers()
+addon:RefreshOrganizerUI()
+assert(organizer.DepositCurrentButton:IsEnabled())
+assert(organizer.DepositAllButton:IsEnabled())
+assert(GuildBankOrganizerDB.settings.depositScope == nil)
+
+assert(addon:StartDeposit(1))
+addon:RefreshOrganizerUI()
+assert(not organizer.DepositCurrentButton:IsShown())
+assert(not organizer.DepositAllButton:IsShown())
+assert(organizer.DepositStopButton:IsShown())
+runTimers()
+addon:RefreshOrganizerUI()
+assert(organizer.DepositCurrentButton:IsShown())
+assert(organizer.DepositAllButton:IsShown())
+assert(not organizer.DepositStopButton:IsShown())
 assert(bags[0][1] == nil)
 assert(bags[0][2] and bags[0][2].itemID == 500)
 assert(string.find(addon.lastReport, "planned=2", 1, true))

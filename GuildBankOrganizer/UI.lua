@@ -74,6 +74,36 @@ local function createButton(parent, text, width, height, callback)
     return button
 end
 
+local function stylePrimaryButton(button)
+    local function setBorder(red, green, blue, alpha)
+        button.Top:SetColorTexture(red, green, blue, alpha)
+        button.Bottom:SetColorTexture(red, green, blue, alpha)
+        button.Left:SetColorTexture(red, green, blue, alpha)
+        button.Right:SetColorTexture(red, green, blue, alpha)
+    end
+    local function applyEnabledStyle(self)
+        self.Background:SetColorTexture(0.15, 0.105, 0.020, 1)
+        setBorder(unpack(COLORS.gold))
+    end
+
+    button:SetScript("OnEnter", function(self)
+        if self:IsEnabled() then
+            self.Background:SetColorTexture(0.22, 0.16, 0.035, 1)
+        end
+    end)
+    button:SetScript("OnLeave", function(self)
+        if self:IsEnabled() then
+            applyEnabledStyle(self)
+        end
+    end)
+    button:SetScript("OnDisable", function(self)
+        self.Background:SetColorTexture(0.035, 0.040, 0.043, 1)
+        setBorder(unpack(COLORS.border))
+    end)
+    button:SetScript("OnEnable", applyEnabledStyle)
+    applyEnabledStyle(button)
+end
+
 local function createLabel(parent, text, x, y)
     local label = parent:CreateFontString(nil, "OVERLAY", "GameFontNormal")
     label:SetPoint("TOPLEFT", x, y)
@@ -274,12 +304,34 @@ local function stopCurrentOperation()
     end
 end
 
-local function runCompactDepositOrStop()
-    if isBusy() then
-        stopCurrentOperation()
-    else
-        GBO:StartDeposit()
+local function depositCurrentTab()
+    local tab = currentTab()
+    if tab then
+        GBO:StartDeposit(tab)
     end
+end
+
+local function depositAllTabs()
+    GBO:StartDeposit()
+end
+
+local function formatDepositCount(scope)
+    return string.format(
+        "%d item%s in %d deposit%s",
+        scope.totalItems,
+        scope.totalItems == 1 and "" or "s",
+        scope.totalMoves,
+        scope.totalMoves == 1 and "" or "s"
+    )
+end
+
+local function formatAllDepositCount(scope)
+    return string.format(
+        "%s across %d tab%s",
+        formatDepositCount(scope),
+        scope.destinationCount,
+        scope.destinationCount == 1 and "" or "s"
+    )
 end
 
 local function updateSelectionDescription()
@@ -465,6 +517,11 @@ function GBO:RefreshOrganizerUI()
     local depositScanning = self.IsDepositScanning and self:IsDepositScanning()
     local depositPlan = self.GetDepositPlan and self:GetDepositPlan()
     local depositsAvailable = depositPlan and depositPlan.totalMoves > 0
+    local currentScope = tab and self.GetDepositPlanScope
+        and self:GetDepositPlanScope(tab)
+    local allScope = self.GetDepositPlanScope and self:GetDepositPlanScope()
+    local currentDepositsAvailable = currentScope and currentScope.totalMoves > 0
+    local allDepositsAvailable = allScope and allScope.totalMoves > 0
 
     if organizerFrame then
         if tab then
@@ -479,11 +536,24 @@ function GBO:RefreshOrganizerUI()
         end
 
         setButtonEnabled(organizerFrame.SortButton, tab and not busy)
-        organizerFrame.StopButton:SetText(busy and "Stop" or "Smart Deposit")
-        setButtonEnabled(
-            organizerFrame.StopButton,
-            busy or (tab and depositsAvailable)
-        )
+        if busy then
+            organizerFrame.DepositCurrentButton:Hide()
+            organizerFrame.DepositAllButton:Hide()
+            organizerFrame.DepositStopButton:Show()
+            setButtonEnabled(organizerFrame.DepositStopButton, true)
+        else
+            organizerFrame.DepositCurrentButton:Show()
+            organizerFrame.DepositAllButton:Show()
+            organizerFrame.DepositStopButton:Hide()
+            setButtonEnabled(
+                organizerFrame.DepositCurrentButton,
+                tab and currentDepositsAvailable
+            )
+            setButtonEnabled(
+                organizerFrame.DepositAllButton,
+                tab and allDepositsAvailable
+            )
+        end
 
         if depositing then
             organizerFrame.StatusText:SetText(self:GetDepositStatus())
@@ -497,7 +567,7 @@ function GBO:RefreshOrganizerUI()
             organizerFrame.StatusText:SetText("Scanning guild-bank tabs...")
         elseif depositsAvailable then
             organizerFrame.StatusText:SetText(
-                "Smart Deposit ready: " .. self:GetDepositPlanSummary()
+                "Smart Deposit ready. Choose this tab or all configured tabs."
             )
         elseif self.lastOutcome then
             organizerFrame.StatusText:SetText(string.format(
@@ -554,7 +624,7 @@ function GBO:RefreshOrganizerUI()
             organizerFrame.ProgressBar:SetMinMaxValues(0, depositPlan.totalMoves)
             organizerFrame.ProgressBar:SetValue(0)
             organizerFrame.ProgressBar.Text:SetText(string.format(
-                "%d items • %d deposits • click Deposit",
+                "%d items • %d deposits available",
                 depositPlan.totalItems,
                 depositPlan.totalMoves
             ))
@@ -564,20 +634,39 @@ function GBO:RefreshOrganizerUI()
             organizerFrame.ProgressBar.Text:SetText("Move count and ETA appear when sorting")
         end
 
-        if not self:HasEnabledDepositProfiles() then
+        if busy then
+            if depositing then
+                organizerFrame.SmartHint:SetText(
+                    "Depositing selected items. Stop waits for the active move to settle."
+                )
+            elseif depositScanning then
+                organizerFrame.SmartHint:SetText("Checking bags and assigned tabs...")
+            else
+                organizerFrame.SmartHint:SetText(
+                    "Finish or stop the active organizer operation before depositing."
+                )
+            end
+            organizerFrame.SetupButton:SetText(
+                self:HasEnabledDepositProfiles() and "Edit" or "Set Up"
+            )
+        elseif not self:HasEnabledDepositProfiles() then
             organizerFrame.SmartHint:SetText(
                 "Choose what belongs in each tab. Setup takes two steps."
             )
             organizerFrame.SetupButton:SetText("Set Up")
-        elseif depositScanning then
-            organizerFrame.SmartHint:SetText("Checking your bags and assigned tabs...")
-            organizerFrame.SetupButton:SetText("Edit")
-        elseif depositsAvailable then
-            organizerFrame.SmartHint:SetText(self:GetDepositPlanSummary())
+        elseif allDepositsAvailable then
+            local currentText = currentDepositsAvailable
+                and formatDepositCount(currentScope)
+                or "No matching items"
+            organizerFrame.SmartHint:SetText(string.format(
+                "This tab: %s\nAll configured tabs: %s",
+                currentText,
+                formatAllDepositCount(allScope)
+            ))
             organizerFrame.SetupButton:SetText("Edit")
         else
             organizerFrame.SmartHint:SetText(
-                "Configured. No matching bag items are ready right now."
+                "No matching bag items are ready right now."
             )
             organizerFrame.SetupButton:SetText("Edit")
         end
@@ -678,7 +767,7 @@ local function createOrganizerFrame()
     local frame = createPanel(
         "GuildBankOrganizerFrame",
         430,
-        232,
+        292,
         "Guild Bank Organizer"
     )
     anchorBesideGuildBank(frame)
@@ -701,13 +790,10 @@ local function createOrganizerFrame()
     frame.ProgressBar = createProgressBar(frame)
     frame.ProgressBar:SetPoint("TOPLEFT", 16, -84)
 
-    frame.SortButton = createButton(frame, "Sort This Tab", 194, 34, function()
+    frame.SortButton = createButton(frame, "Sort This Tab", 398, 34, function()
         GBO:StartSortCurrentTab()
     end)
     frame.SortButton:SetPoint("TOPLEFT", 16, -112)
-
-    frame.StopButton = createButton(frame, "Smart Deposit", 194, 34, runCompactDepositOrStop)
-    frame.StopButton:SetPoint("LEFT", frame.SortButton, "RIGHT", 8, 0)
 
     frame.SetupCard = createSolidTexture(
         frame,
@@ -717,23 +803,58 @@ local function createOrganizerFrame()
         0.067,
         1
     )
-    frame.SetupCard:SetPoint("TOPLEFT", 16, -156)
+    frame.SetupCard:SetPoint("TOPLEFT", 16, -154)
     frame.SetupCard:SetPoint("BOTTOMRIGHT", -16, 28)
 
     frame.SmartTitle = frame:CreateFontString(nil, "OVERLAY", "GameFontNormalSmall")
-    frame.SmartTitle:SetPoint("TOPLEFT", 28, -166)
+    frame.SmartTitle:SetPoint("TOPLEFT", 28, -164)
     frame.SmartTitle:SetText("Smart Deposit")
     frame.SmartTitle:SetTextColor(unpack(COLORS.gold))
     frame.SmartHint = frame:CreateFontString(nil, "OVERLAY", "GameFontHighlightSmall")
-    frame.SmartHint:SetPoint("TOPLEFT", 28, -184)
-    frame.SmartHint:SetPoint("TOPRIGHT", -98, -184)
+    frame.SmartHint:SetPoint("TOPLEFT", 28, -194)
+    frame.SmartHint:SetPoint("TOPRIGHT", -28, -194)
     frame.SmartHint:SetJustifyH("LEFT")
     frame.SmartHint:SetText("Choose what belongs in each tab.")
 
     frame.SetupButton = createButton(frame, "Set Up", 70, 28, function()
         GBO:ShowDepositSettingsUI()
     end)
-    frame.SetupButton:SetPoint("TOPRIGHT", -26, -169)
+    frame.SetupButton:SetPoint("TOPRIGHT", -26, -159)
+
+    frame.DepositCurrentButton = createButton(
+        frame,
+        "Deposit This Tab",
+        182,
+        30,
+        depositCurrentTab
+    )
+    frame.DepositCurrentButton:SetPoint("TOPLEFT", 28, -226)
+    stylePrimaryButton(frame.DepositCurrentButton)
+
+    frame.DepositAllButton = createButton(
+        frame,
+        "Deposit All Tabs",
+        182,
+        30,
+        depositAllTabs
+    )
+    frame.DepositAllButton:SetPoint(
+        "LEFT",
+        frame.DepositCurrentButton,
+        "RIGHT",
+        8,
+        0
+    )
+
+    frame.DepositStopButton = createButton(
+        frame,
+        "Stop",
+        372,
+        30,
+        stopCurrentOperation
+    )
+    frame.DepositStopButton:SetPoint("TOPLEFT", 28, -226)
+    frame.DepositStopButton:Hide()
 
     frame.AdvancedButton = createButton(frame, "Settings", 72, 20, function()
         GBO:ShowAdvancedUI()
