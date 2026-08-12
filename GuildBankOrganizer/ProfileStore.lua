@@ -22,6 +22,8 @@ local PROFILE_FIELDS = {
     enabledStateVersion = true,
 }
 
+local GUILD_CONTAINER_RECOVERY_KEY = "__guildProfileContainer"
+
 local expansionIDs = {}
 for _, expansion in ipairs(GBO:GetDepositExpansionCatalog()) do
     expansionIDs[expansion.id] = true
@@ -460,6 +462,14 @@ function GBO:MigrateDepositProfileDatabase(db, previousSchema)
                 end
                 guildProfiles[tab] = normalized
             end
+        else
+            preserveRecovery(
+                db,
+                guildKey,
+                GUILD_CONTAINER_RECOVERY_KEY,
+                guildProfiles
+            )
+            db.depositProfiles[guildKey] = {}
         end
     end
 end

@@ -908,6 +908,30 @@ addon:MigrateDepositProfileDatabase(GuildBankOrganizerDB, 5)
 assert(addon:GetDepositProfileRecovery()["Test Realm\031Test Guild"][2] == firstRecovery)
 assert(not addon:GetDepositProfile(2, false).enabled)
 
+local malformedGuildDatabase = {
+    depositProfiles = {
+        ["Test Realm\031Test Guild"] = "first malformed guild container",
+    },
+}
+addon:MigrateDepositProfileDatabase(malformedGuildDatabase, 5)
+assert(type(malformedGuildDatabase.depositProfiles["Test Realm\031Test Guild"]) == "table")
+assert(
+    malformedGuildDatabase.depositProfileRecovery["Test Realm\031Test Guild"]
+        .__guildProfileContainer == "first malformed guild container"
+)
+local initializedDatabase = addon.db
+addon.db = malformedGuildDatabase
+assert(type(addon:GetDepositProfiles(false)) == "table")
+assert(addon:GetDepositProfile(1, false) == nil)
+addon.db = initializedDatabase
+malformedGuildDatabase.depositProfiles["Test Realm\031Test Guild"] = false
+addon:MigrateDepositProfileDatabase(malformedGuildDatabase, 5)
+assert(type(malformedGuildDatabase.depositProfiles["Test Realm\031Test Guild"]) == "table")
+assert(
+    malformedGuildDatabase.depositProfileRecovery["Test Realm\031Test Guild"]
+        .__guildProfileContainer == "first malformed guild container"
+)
+
 local legacyDatabase = {
     depositProfiles = {
         ["Legacy Realm\031Legacy Guild"] = {
