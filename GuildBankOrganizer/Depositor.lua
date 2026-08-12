@@ -227,6 +227,10 @@ local function sameBagItem(slot, expectedItemID, expectedCount)
         and slot.count == expectedCount
 end
 
+local ROUTE_ALL = 1
+local ROUTE_EXPANSION = 2
+local ROUTE_EXACT = 3
+
 local function enabledProfileRouting()
     local profiles = GBO:GetDepositProfiles(false) or {}
     local routing = {
@@ -257,7 +261,12 @@ local function enabledProfileRouting()
             end
             for itemID, enabled in pairs(profile.exactItemIDs) do
                 if enabled then
-                    routing.exactItemIDs[tonumber(itemID)] = tab
+                    itemID = tonumber(itemID)
+                    routing.exactItemIDs[itemID] =
+                        routing.exactItemIDs[itemID] or {}
+                    table.insert(routing.exactItemIDs[itemID], {
+                        tab = tab,
+                    })
                 end
             end
         end
@@ -265,43 +274,107 @@ local function enabledProfileRouting()
     return routing, tabs
 end
 
-local function routeBagItem(routing, item)
-    local exactTab = routing.exactItemIDs[item.itemID]
-    if exactTab then
-        return exactTab, "exact item ID"
-    end
-    if not item.categoryKey then
+function GBO:ResolveDepositRoute(routing, item)
+    if type(routing) ~= "table" or type(item) ~= "table" then
         return nil
     end
-    local categoryRoutes = routing.categories[item.categoryKey] or {}
-    for _, route in ipairs(categoryRoutes) do
-        if route.allExpansions
-            or item.expansionID ~= nil
-                and route.expansions[item.expansionID]
-        then
-            return route.tab, item.categoryEvidence
+
+    local candidates = {}
+    local function addCandidate(tab, priority, evidence)
+        tab = tonumber(tab)
+        if tab then
+            table.insert(candidates, {
+                tab = tab,
+                priority = priority,
+                evidence = evidence,
+            })
         end
     end
-    return nil
+
+    local exactRoutes = routing.exactItemIDs
+        and routing.exactItemIDs[item.itemID]
+        or {}
+    for _, route in ipairs(exactRoutes) do
+        addCandidate(
+            type(route) == "table" and route.tab or route,
+            ROUTE_EXACT,
+            "exact item ID"
+        )
+    end
+
+    local categoryRoutes = item.categoryKey
+        and routing.categories
+        and routing.categories[item.categoryKey]
+        or {}
+    for _, route in ipairs(categoryRoutes) do
+        if route.allExpansions then
+            addCandidate(route.tab, ROUTE_ALL, "All Expansions profile")
+        elseif item.expansionID ~= nil
+            and type(route.expansions) == "table"
+            and route.expansions[item.expansionID]
+        then
+            addCandidate(route.tab, ROUTE_EXPANSION, item.categoryEvidence)
+        end
+    end
+
+    local highestPriority = 0
+    for _, candidate in ipairs(candidates) do
+        highestPriority = math.max(highestPriority, candidate.priority)
+    end
+    if highestPriority == 0 then
+        return nil
+    end
+
+    local tabs = {}
+    local seenTabs = {}
+    local evidence
+    for _, candidate in ipairs(candidates) do
+        if candidate.priority == highestPriority then
+            evidence = evidence or candidate.evidence
+            if not seenTabs[candidate.tab] then
+                seenTabs[candidate.tab] = true
+                table.insert(tabs, candidate.tab)
+            end
+        end
+    end
+    table.sort(tabs)
+    if #tabs > 1 then
+        return nil, nil, {
+            itemID = item.itemID,
+            name = item.name or ("Item " .. tostring(item.itemID)),
+            categoryKey = item.categoryKey,
+            expansionID = item.expansionID,
+            priority = highestPriority,
+            tabs = tabs,
+        }
+    end
+    return tabs[1], evidence, nil
 end
 
 local function readEligibleBagItems(routing)
     local items = {}
+    local conflicts = {}
+    local conflictedItemIDs = {}
     local maximumBag = NUM_BAG_SLOTS or 4
     for bag = 0, maximumBag do
         local numSlots = getContainerNumSlots and getContainerNumSlots(bag) or 0
         for slot = 1, numSlots do
             local item = readBagSlot(bag, slot)
-            local tab, routeEvidence
-            if item then
-                tab, routeEvidence = routeBagItem(routing, item)
-            end
-            if item and tab and not item.locked and not item.bound and item.link then
-                item.targetTab = tab
-                item.routeEvidence = routeEvidence
-                item.planCategoryKey =
-                    item.categoryKey or ("item:" .. tostring(item.itemID))
-                table.insert(items, item)
+            if item and not item.locked and not item.bound and item.link then
+                local tab, routeEvidence, conflict =
+                    GBO:ResolveDepositRoute(routing, item)
+                if conflict then
+                    if not conflictedItemIDs[conflict.itemID] then
+                        conflictedItemIDs[conflict.itemID] = true
+                        table.insert(conflicts, conflict)
+                    end
+                elseif tab then
+                    item.targetTab = tab
+                    item.routeEvidence = routeEvidence
+                    item.planCategoryKey =
+                        item.categoryKey or ("item:" .. tostring(item.itemID))
+                    table.insert(items, item)
+                end
             end
         end
     end
@@ -314,7 +387,7 @@ local function readEligibleBagItems(routing)
         end
         return left.slot < right.slot
     end)
-    return items
+    return items, conflicts
 end
 
 local function cloneBankSlots(tab)
@@ -444,7 +517,7 @@ end
 
 local function buildDepositPlan()
     local routing, profiles = enabledProfileRouting()
-    local sources = readEligibleBagItems(routing)
+    local sources, routingConflicts = readEligibleBagItems(routing)
     local byTab = {}
     for tab in pairs(profiles) do
         byTab[tab] = {}
@@ -461,6 +534,7 @@ local function buildDepositPlan()
         totalItems = 0,
         totalStacks = 0,
         skippedItems = 0,
+        routingConflicts = routingConflicts,
     }
     for tab = 1, GetNumGuildBankTabs() do
         local profile = profiles[tab]
@@ -486,6 +560,7 @@ local function filterDepositPlan(plan, selectedTabs)
         totalItems = 0,
         totalStacks = 0,
         skippedItems = 0,
+        routingConflicts = {},
     }
     if not plan then
         return filtered
@@ -502,11 +577,33 @@ local function filterDepositPlan(plan, selectedTabs)
             filtered.skippedItems = filtered.skippedItems + tabPlan.skippedItems
         end
     end
+    for _, conflict in ipairs(plan.routingConflicts or {}) do
+        local included = not selectedTabs
+        if selectedTabs then
+            for _, conflictTab in ipairs(conflict.tabs) do
+                if selectedTabs[conflictTab] then
+                    included = true
+                    break
+                end
+            end
+        end
+        if included then
+            table.insert(filtered.routingConflicts, conflict)
+        end
+    end
     return filtered
 end
 
 function GBO:GetDepositPlan()
     return depositor.plan
+end
+
+function GBO:GetFirstDepositRoutingConflict()
+    local plan = depositor.plan
+    return plan
+        and plan.routingConflicts
+        and plan.routingConflicts[1]
+        or nil
 end
 
 function GBO:GetDepositPlanScope(tab)
@@ -534,6 +631,7 @@ function GBO:GetDepositPlanScope(tab)
         totalMoves = scoped.totalMoves,
         totalItems = scoped.totalItems,
         destinationCount = destinationCount,
+        routingConflictCount = #scoped.routingConflicts,
     }
 end
 
@@ -636,6 +734,12 @@ end
 
 local function buildReport(ok, reason)
     local client = GBO.client or {}
+    local routingConflicts = depositor.routingConflicts or {}
+    local firstRoutingConflict = routingConflicts[1]
+    local firstRoutingConflictTabs = {}
+    for _, tab in ipairs(firstRoutingConflict and firstRoutingConflict.tabs or {}) do
+        table.insert(firstRoutingConflictTabs, tostring(tab))
+    end
     local lines = {
         "Guild Bank Organizer smart deposit report",
         string.format("addon=%s", GBO.version),
@@ -662,6 +766,14 @@ local function buildReport(ok, reason)
             depositor.averageSeconds or 0,
             depositor.skippedItems or 0
         ),
+        string.format(
+            "routingConflicts=%d firstRoutingConflictItemID=%s firstRoutingConflictTabs=%s",
+            #routingConflicts,
+            tostring(firstRoutingConflict and firstRoutingConflict.itemID or "none"),
+            #firstRoutingConflictTabs > 0
+                and table.concat(firstRoutingConflictTabs, ",")
+                or "none"
+        ),
         string.format("bagEvents=%d slotEvents=%d uiErrors=%d %s",
             depositor.bagEvents,
             depositor.slotEvents,
@@ -685,6 +797,8 @@ local function buildReport(ok, reason)
         depositedItems = depositor.depositedItems,
         averageMoveSeconds = depositor.averageSeconds,
         skippedItems = depositor.skippedItems,
+        routingConflictCount = #routingConflicts,
+        firstRoutingConflict = firstRoutingConflict,
         report = report,
     }
 end
@@ -1075,6 +1189,9 @@ function GBO:StartDeposit(tab, refreshed)
         return false
     end
     local scopedPlan = filterDepositPlan(plan, selectedTabs)
+    local routingConflicts = tab
+        and scopedPlan.routingConflicts
+        or plan.routingConflicts
 
     depositor.generation = depositor.generation + 1
     depositor.running = true
@@ -1091,6 +1208,7 @@ function GBO:StartDeposit(tab, refreshed)
     depositor.averageSeconds = nil
     depositor.retries = 0
     depositor.skippedItems = scopedPlan.skippedItems
+    depositor.routingConflicts = routingConflicts
     depositor.bagEvents = 0
     depositor.slotEvents = 0
     depositor.uiErrors = {}
@@ -1106,6 +1224,18 @@ function GBO:StartDeposit(tab, refreshed)
         scopedPlan.totalItems,
         self.defaults.depositQuietPeriod
     ))
+    if routingConflicts[1] then
+        local conflictTabs = {}
+        for _, conflictTab in ipairs(routingConflicts[1].tabs) do
+            table.insert(conflictTabs, tostring(conflictTab))
+        end
+        addTimeline(string.format(
+            "routing conflicts=%d; first item=%s tabs=%s",
+            #routingConflicts,
+            tostring(routingConflicts[1].itemID),
+            table.concat(conflictTabs, ",")
+        ))
+    end
     self:Print(string.format(
         "Smart Deposit: %d items in %d planned deposits.",
         scopedPlan.totalItems,

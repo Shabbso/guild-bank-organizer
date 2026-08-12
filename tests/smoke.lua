@@ -31,6 +31,7 @@ local itemDatabase = {
     [4293] = { name = "Pattern: Hillman's Leather Vest", quality = 1, itemLevel = 1, maxStack = 1, sellPrice = 1, classID = 9, subclassID = 1, expansionID = 0 },
     [4342] = { name = "Purple Dye", quality = 1, itemLevel = 1, maxStack = 20, sellPrice = 1, classID = 7, subclassID = 11, expansionID = 0 },
     [4357] = { name = "Rough Blasting Powder", quality = 1, itemLevel = 1, maxStack = 20, sellPrice = 1, classID = 7, subclassID = 1, expansionID = 0 },
+    [2447] = { name = "Peacebloom", quality = 1, itemLevel = 1, maxStack = 20, sellPrice = 1, classID = 7, subclassID = 9, expansionID = 0 },
     [785] = { name = "Mageroyal", quality = 1, itemLevel = 1, maxStack = 20, sellPrice = 1, classID = 7, subclassID = 9, expansionID = 0 },
     [2604] = { name = "Red Dye", quality = 1, itemLevel = 1, maxStack = 20, sellPrice = 1, classID = 7, subclassID = 11, expansionID = 0 },
     [3371] = { name = "Crystal Vial", quality = 1, itemLevel = 5, maxStack = 20, sellPrice = 1, classID = 7, subclassID = 11, bagFamily = 16, expansionID = 0 },
@@ -40,6 +41,7 @@ local itemDatabase = {
     [23418] = { name = "Test Sapper Charge", quality = 1, itemLevel = 1, maxStack = 20, sellPrice = 1, classID = 7, subclassID = 11, expansionID = 1 },
     [23572] = { name = "Primal Nether", quality = 1, itemLevel = 1, maxStack = 20, sellPrice = 1, classID = 7, subclassID = 11, expansionID = 1 },
     [79868] = { name = "Pandaren Pottery Shard", quality = 1, itemLevel = 1, maxStack = 20, sellPrice = 1, classID = 7, subclassID = 11, expansionID = 254 },
+    [72234] = { name = "Green Tea Leaf", quality = 1, itemLevel = 1, maxStack = 20, sellPrice = 1, classID = 7, subclassID = 9, expansionID = 254 },
     [83064] = { name = "Spinefish", quality = 1, itemLevel = 1, maxStack = 20, sellPrice = 1, classID = 7, subclassID = 11 },
     [103641] = { name = "Singing Crystal", quality = 1, itemLevel = 1, maxStack = 20, sellPrice = 1, classID = 0, subclassID = 5 },
     [109999] = { name = "Unclassified Material", quality = 1, itemLevel = 1, maxStack = 20, sellPrice = 1, classID = 7, subclassID = 11 },
@@ -1177,6 +1179,142 @@ addon:ShowDepositSettingsUI()
 assert(GuildBankOrganizerDepositSettingsFrame.EnabledCheck:GetChecked())
 addon:HideOrganizerUI()
 runTimers()
+
+-- Smart Deposit resolves overlapping routes by specificity: exact item IDs
+-- beat expansion-specific categories, which beat All Expansions categories.
+-- A legacy equal-priority tie is reported and only the conflicted item stays
+-- in the bags; unrelated items remain depositable.
+numGuildBankTabs = 3
+currentGuildBankTab = 1
+slots[1] = {}
+slots[2] = {}
+slots[3] = {}
+bags[0] = {
+    [1] = makeItem(785, 3),
+    [2] = makeItem(72234, 4),
+    [3] = makeItem(2447, 5),
+}
+assert(addon:SaveDepositProfile(
+    1,
+    true,
+    "All Herbs",
+    { herbs = true },
+    true,
+    {},
+    {}
+))
+runTimers()
+assert(addon:SaveDepositProfile(
+    2,
+    true,
+    "Mists Herbs",
+    { herbs = true },
+    false,
+    { [4] = true },
+    {}
+))
+runTimers()
+assert(addon:SaveDepositProfile(
+    3,
+    true,
+    "Mageroyal",
+    {},
+    true,
+    {},
+    { [785] = true }
+))
+runTimers()
+
+local routingFixture = {
+    exactItemIDs = {
+        [785] = { { tab = 3 } },
+    },
+    categories = {
+        herbs = {
+            { tab = 1, allExpansions = true, expansions = {} },
+            { tab = 2, allExpansions = false, expansions = { [4] = true } },
+        },
+    },
+}
+local mageroyalTab, mageroyalEvidence = addon:ResolveDepositRoute(
+    routingFixture,
+    addon:ReadDepositBagSlot(0, 1)
+)
+assert(mageroyalTab == 3)
+assert(mageroyalEvidence == "exact item ID")
+local mistsHerbTab, mistsHerbEvidence = addon:ResolveDepositRoute(
+    routingFixture,
+    addon:ReadDepositBagSlot(0, 2)
+)
+assert(mistsHerbTab == 2)
+assert(mistsHerbEvidence == "Trade Goods subclass")
+local classicHerbTab, classicHerbEvidence = addon:ResolveDepositRoute(
+    routingFixture,
+    addon:ReadDepositBagSlot(0, 3)
+)
+assert(classicHerbTab == 1)
+assert(classicHerbEvidence == "All Expansions profile")
+
+local precedencePlan = assert(addon:GetDepositPlan())
+assert(precedencePlan.tabs[1].operations[1].sourceItemID == 2447)
+assert(precedencePlan.tabs[2].operations[1].sourceItemID == 72234)
+assert(precedencePlan.tabs[3].operations[1].sourceItemID == 785)
+assert(#precedencePlan.routingConflicts == 0)
+
+local profiles = addon:GetDepositProfiles(false)
+profiles[3] = {
+    enabled = true,
+    label = "Legacy Mists Herbs",
+    categories = { herbs = true },
+    allExpansions = false,
+    expansions = { [4] = true },
+    exactItemIDs = {},
+    enabledStateVersion = 1,
+}
+assert(addon:RefreshDepositPlan())
+runTimers()
+
+local conflictPlan = assert(addon:GetDepositPlan())
+assert(conflictPlan.totalItems == 8)
+assert(conflictPlan.totalMoves == 2)
+assert(#conflictPlan.routingConflicts == 1)
+local conflict = assert(addon:GetFirstDepositRoutingConflict())
+assert(conflict.itemID == 72234)
+assert(conflict.name == "Green Tea Leaf")
+assert(conflict.categoryKey == "herbs")
+assert(conflict.expansionID == 4)
+assert(conflict.priority == 2)
+assert(#conflict.tabs == 2 and conflict.tabs[1] == 2 and conflict.tabs[2] == 3)
+for _, tab in ipairs(conflictPlan.order) do
+    for _, operation in ipairs(conflictPlan.tabs[tab].operations) do
+        assert(operation.sourceItemID ~= 72234)
+    end
+end
+
+addon:ShowOrganizerUI()
+local routingOrganizer = GuildBankOrganizerFrame
+addon:RefreshOrganizerUI()
+local routingMessage = routingOrganizer.SmartHint:GetText()
+assert(string.find(routingMessage, "Green Tea Leaf", 1, true))
+assert(string.find(routingMessage, "Herbs", 1, true))
+assert(string.find(routingMessage, "Mists of Pandaria", 1, true))
+assert(string.find(routingMessage, "Tab 2", 1, true))
+assert(string.find(routingMessage, "Tab 3", 1, true))
+assert(routingOrganizer.SetupButton:GetText() == "Resolve")
+routingOrganizer.SetupButton.scripts.OnClick()
+assert(GuildBankOrganizerDepositSettingsFrame.TabInput:GetText() == "2")
+addon:HideOrganizerUI()
+runTimers()
+
+assert(addon:StartDeposit())
+runTimers()
+assert(bags[0][1] == nil)
+assert(bags[0][2] and bags[0][2].itemID == 72234 and bags[0][2].count == 4)
+assert(bags[0][3] == nil)
+assert(string.find(addon.lastReport, "routingConflicts=1", 1, true))
+assert(string.find(addon.lastReport, "firstRoutingConflictItemID=72234", 1, true))
+assert(string.find(addon.lastReport, "firstRoutingConflictTabs=2,3", 1, true))
+table.remove(GuildBankOrganizerDB.runs, 1)
 
 -- A current-tab deposit must exclude other configured tabs from both the
 -- operation and its reported totals, while the all-tabs preview includes

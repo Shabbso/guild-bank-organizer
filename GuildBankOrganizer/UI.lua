@@ -334,6 +334,20 @@ local function formatAllDepositCount(scope)
     )
 end
 
+local function formatRoutingConflict(conflict)
+    local tabLabels = {}
+    for _, tab in ipairs(conflict.tabs or {}) do
+        table.insert(tabLabels, "Tab " .. tostring(tab))
+    end
+    return string.format(
+        "%s has equally specific %s / %s routes to %s. Choose one destination.",
+        tostring(conflict.name or ("Item " .. tostring(conflict.itemID))),
+        tostring(GBO:GetDepositCategoryName(conflict.categoryKey) or "Exact item"),
+        tostring(GBO:GetDepositExpansionName(conflict.expansionID) or "Unknown expansion"),
+        table.concat(tabLabels, " and ")
+    )
+end
+
 local function updateSelectionDescription()
     if not advancedFrame then
         return
@@ -520,6 +534,8 @@ function GBO:RefreshOrganizerUI()
     local currentScope = tab and self.GetDepositPlanScope
         and self:GetDepositPlanScope(tab)
     local allScope = self.GetDepositPlanScope and self:GetDepositPlanScope()
+    local routingConflict = self.GetFirstDepositRoutingConflict
+        and self:GetFirstDepositRoutingConflict()
     local currentDepositsAvailable = currentScope and currentScope.totalMoves > 0
     local allDepositsAvailable = allScope and allScope.totalMoves > 0
 
@@ -565,6 +581,10 @@ function GBO:RefreshOrganizerUI()
             organizerFrame.StatusText:SetText("Advanced diagnostic is running.")
         elseif self:IsScanRunning() then
             organizerFrame.StatusText:SetText("Scanning guild-bank tabs...")
+        elseif routingConflict then
+            organizerFrame.StatusText:SetText(
+                "Smart Deposit needs attention: resolve a routing conflict."
+            )
         elseif depositsAvailable then
             organizerFrame.StatusText:SetText(
                 "Smart Deposit ready. Choose this tab or all configured tabs."
@@ -649,6 +669,9 @@ function GBO:RefreshOrganizerUI()
             organizerFrame.SetupButton:SetText(
                 self:HasEnabledDepositProfiles() and "Edit" or "Set Up"
             )
+        elseif routingConflict then
+            organizerFrame.SmartHint:SetText(formatRoutingConflict(routingConflict))
+            organizerFrame.SetupButton:SetText("Resolve")
         elseif not self:HasEnabledDepositProfiles() then
             organizerFrame.SmartHint:SetText(
                 "Choose what belongs in each tab. Setup takes two steps."
@@ -817,7 +840,11 @@ local function createOrganizerFrame()
     frame.SmartHint:SetText("Choose what belongs in each tab.")
 
     frame.SetupButton = createButton(frame, "Set Up", 70, 28, function()
-        GBO:ShowDepositSettingsUI()
+        local conflict = GBO.GetFirstDepositRoutingConflict
+            and GBO:GetFirstDepositRoutingConflict()
+        GBO:ShowDepositSettingsUI(
+            conflict and conflict.tabs and conflict.tabs[1]
+        )
     end)
     frame.SetupButton:SetPoint("TOPRIGHT", -26, -159)
 
@@ -1485,7 +1512,7 @@ function GBO:ShowAdvancedUI()
     self:RefreshOrganizerUI()
 end
 
-function GBO:ShowDepositSettingsUI()
+function GBO:ShowDepositSettingsUI(tab)
     if not self:IsBankOpen() then
         self:Print("Open the guild bank before configuring Smart Deposits.")
         return
@@ -1499,7 +1526,7 @@ function GBO:ShowDepositSettingsUI()
         advancedFrame:Hide()
     end
     depositSettingsFrame:Show()
-    loadDepositSettings(currentTab())
+    loadDepositSettings(tonumber(tab) or currentTab())
     self:RefreshOrganizerUI()
 end
 
