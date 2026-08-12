@@ -74,12 +74,25 @@ into guild-bank tabs:
 2. Use the currently selected bank tab, or load another destination tab.
 3. Select every category that belongs there, such as Cloth and Enchanting.
 4. Choose **All** expansions, or select Classic/TBC/Wrath/Cata/Mists.
-5. Enable and save the profile, then click **Scan Bags Now** for a preview.
+5. Enable the profile, then click **Scan Bags Now** for a preview.
+
+Valid changes save automatically. Checkboxes save as soon as they are toggled;
+the profile name and exact item-ID field save on Enter or when keyboard focus
+leaves the field. The editor also saves before **Scan Bags Now**, **Load Tab**,
+**Use Current**, **Back to Organizer**, or closing the page. **Save Now** is an
+optional explicit confirmation and uses the same validation. Invalid edits stay
+visible with an explanation and never replace the last valid saved profile.
+Saved profiles are stored per guild and survive logout and `/reload`.
 
 Each purchased tab can have its own profile, and each profile can accept
 multiple categories. The same category may be routed to different tabs when
-their expansion filters do not overlap. Optional exact item IDs handle unusual
+their expansion filters differ. Optional exact item IDs handle unusual
 lockboxes or crafted items whose profession is not present in item metadata.
+Routing always chooses the most specific match: an exact item ID beats a
+category route, and a specific-expansion category route beats an **All
+Expansions** fallback. If two tabs have equally specific legacy routes, the
+conflict names both tabs and the affected item stays in the player's bags;
+unrelated items can still be deposited.
 When matching items are found, the compact panel shows the item and deposit
 counts for two explicit choices:
 
@@ -106,9 +119,11 @@ the unusable expansion value `254`; GBO resolves the era from Blizzard client
 item data bundled as compact correction ranges. Hover a category in setup to
 see the exact rule. The generated MoP profession catalog covers pigments,
 inks, Engineering parts, profession recipes, bandages, oils, dyes, and other
-objects that the game's broad item class cannot identify reliably. Items used
-by several professions without one defensible owner use **Shared Profession
-Supplies**, avoiding overlapping tab routes. The client combines raw fish,
+objects that the game's broad item class cannot identify reliably. A small,
+reviewed set of materials with several defensible owners uses **Shared Crafting
+Reagents**, avoiding overlapping tab routes. Obvious parchment, vellum, dyes,
+vials, and similar supplies instead use their intuitive profession category.
+The client combines raw fish,
 meat, and other cooking ingredients, so that public category is intentionally
 named **Fish & Cooking**. Armor, Weapons, Cloth, Ore, Leather, Herbs, and
 Elemental materials keep their intrinsic categories even when a profession
@@ -134,6 +149,8 @@ Click **Settings** for:
 
 - automatic-open and reverse-direction settings;
 - sort-cadence configuration;
+- a searchable **Category Reference** with definitions, examples, exact
+  numeric item-ID lookup, and the complete Shared Crafting Reagents list;
 - read-only scanning;
 - movement diagnostics;
 - copyable operation reports.

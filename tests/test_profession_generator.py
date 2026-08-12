@@ -1,3 +1,4 @@
+import re
 import unittest
 
 from scripts.generate_profession_data import (
@@ -74,6 +75,84 @@ class TaxonomyPolicyTests(unittest.TestCase):
         self.assertIn("function GBO:GetProfessionReferenceItem(itemID)", lua)
         self.assertIn("function GBO:SearchProfessionReference(query, limit)", lua)
         self.assertIn("function GBO:GetSharedCraftingReagents()", lua)
+
+    def test_lua_lookup_bodies_preserve_public_search_behavior(self):
+        lua = render_lua({
+            "generated": {1: GeneratedCategory("alchemy", "generated", ())},
+            "classifications": {1: "alchemy"},
+            "sparse": {1: {"Display_lang": "Test Vial"}},
+            "reference": {
+                1: {
+                    "item_id": 1,
+                    "name": "Test Vial",
+                    "category": "alchemy",
+                    "evidence": "generated",
+                    "status": "public",
+                },
+            },
+            "connected_count": 1,
+            "candidate_count": 1,
+        })
+
+        numeric_lookup = re.search(
+            r'if string\.match\(query, "\^%d\+\$"\) then\n'
+            r'\s+local record = professionReference\[tonumber\(query\)\]\n'
+            r'\s+return record and \{ record \} or \{\}',
+            lua,
+        )
+        self.assertIsNotNone(numeric_lookup)
+        self.assertIn('if record.status == "public" and string.find(', lua)
+        self.assertIn('string.lower(record.name), query, 1, true', lua)
+        self.assertIn('if left.name == right.name then', lua)
+        self.assertIn('return left.itemID < right.itemID', lua)
+        self.assertIn('for index = #results, limit + 1, -1 do', lua)
+
+    def test_lua_lookup_tables_encode_public_and_excluded_records(self):
+        lua = render_lua({
+            "generated": {52078: GeneratedCategory(
+                "profession_supplies",
+                "curated shared crafting reagent",
+                ("blacksmithing", "tailoring"),
+            )},
+            "classifications": {52078: "profession_supplies"},
+            "sparse": {52078: {"Display_lang": "Chaos Orb"}},
+            "reference": {
+                52078: {
+                    "item_id": 52078,
+                    "name": "Chaos Orb",
+                    "category": "profession_supplies",
+                    "evidence": "curated shared crafting reagent",
+                    "status": "public",
+                },
+                23418: {
+                    "item_id": 23418,
+                    "name": "Test Sapper Charge",
+                    "category": None,
+                    "evidence": "internal test item",
+                    "status": "excluded",
+                },
+            },
+            "connected_count": 2,
+            "candidate_count": 2,
+        })
+
+        self.assertRegex(
+            lua,
+            r'\[23418\] = \{\n'
+            r'\s+itemID = 23418,\n'
+            r'\s+name = "Test Sapper Charge",\n'
+            r'\s+categoryKey = nil,\n'
+            r'\s+evidence = "internal test item",\n'
+            r'\s+status = "excluded",',
+        )
+        self.assertRegex(
+            lua,
+            r'local sharedCraftingReagents = \{\n\s+52078,\n\}',
+        )
+        self.assertIn(
+            'table.insert(results, professionReference[itemID])',
+            lua,
+        )
 
     def test_unknown_recipe_subclass_defers_to_other_metadata(self):
         self.assertIsNone(

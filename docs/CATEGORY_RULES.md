@@ -6,10 +6,10 @@ several guild-bank tabs.
 
 Rules are evaluated in this order:
 
-1. a small, reviewable list of safety overrides;
-2. generated MoP profession item data for records whose broad class is
-   misleading;
-3. intrinsic class, subclass, equipment-slot, and recipe metadata;
+1. curated item-ID assignments and reviewed exclusions;
+2. intrinsic class, subclass, equipment-slot, and recipe metadata;
+3. generated MoP profession item data for records whose broad metadata is not
+   specific enough;
 4. one unambiguous specialized-bag family for an otherwise unknown future
    item.
 
@@ -40,22 +40,24 @@ Armor, Weapons, Cloth, Ore, Leather, Herbs, or Elemental materials.
 | Tailoring | Patterns and generated non-equipment Tailoring products |
 | Leatherworking | Patterns and generated non-equipment Leatherworking products |
 | First Aid | Bandages, manuals, anti-venoms, and generated First Aid supplies |
-| Shared Profession Supplies | Items with several profession owners and no stronger intrinsic category |
+| Shared Crafting Reagents | Reviewed allowlist items with several defensible profession owners and no stronger intrinsic category |
 | Archaeology | Bankable keystones; fragment currencies are not bag items |
 
 The generated catalog is built from the MoP Classic `Item`, `ItemSparse`,
-`SkillLineAbility`, `SpellReagents`, and `SpellEffect` client tables. See
-[`PROFESSION_COVERAGE.md`](PROFESSION_COVERAGE.md) for counts, methodology,
-shared items, and the reproduction command.
+`SkillLineAbility`, `SpellReagents`, and `SpellEffect` client tables. See the
+generated [`PROFESSION_COVERAGE.md`](PROFESSION_COVERAGE.md#shared-crafting-reagents)
+for the complete Shared Crafting Reagents allowlist, counts, methodology, and
+the reproduction command.
 
 ## Why shared supplies are separate
 
-Some items genuinely serve several professions. Crystal Vials are used by
-Alchemy and Enchanting; many dyes are used by Tailoring and Leatherworking;
-raid crafting reagents can feed three or more armor professions. Assigning
-these items to every profession would make tab routing overlap and depend on
-scan order. **Shared Profession Supplies** is the honest, deterministic
-category for that case.
+Some raid and endgame crafting reagents genuinely serve several professions
+without one intuitive owner. Assigning them to every profession would make tab
+routing overlap and depend on scan order. **Shared Crafting Reagents** is a
+small reviewed allowlist for that case. Obvious supplies such as Crystal Vial,
+parchment, vellum, and dyes instead route to the most intuitive player-facing
+profession category. Generation stops when a new multi-owner item has not been
+curated, explicitly allowlisted as Shared, or excluded.
 
 ## Archaeology
 
@@ -86,7 +88,11 @@ correction table stores only ranges where compact item-ID thresholds overlap.
 
 ## Runtime safety boundaries
 
-- Profile exact item IDs take precedence over category selection.
+- Profile exact item IDs take precedence over category routes.
+- A specific-expansion category route takes precedence over an All Expansions
+  route for the same category.
+- Equal-priority routes to different tabs identify both destinations and leave
+  the conflicted item in the player's bags.
 - Bound and locked bag items are never added to a deposit plan.
 - Base item data excludes bind-on-pickup, Quest-class, quest-bound, and
   conjured records from the generated coverage denominator.

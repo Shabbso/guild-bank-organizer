@@ -44,7 +44,7 @@ instance can be bound even when its base item record is not.
 | Leatherworking | 221 | 26 | 247 |
 | Lockboxes | 4 | 0 | 4 |
 | Ore, Bars & Stone | 96 | 1 | 97 |
-| Shared Profession Supplies | 0 | 19 | 19 |
+| Shared Crafting Reagents | 0 | 19 | 19 |
 | Tailoring | 199 | 18 | 217 |
 | Trinkets | 27 | 0 | 27 |
 | Weapons | 219 | 0 | 219 |

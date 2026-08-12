@@ -102,7 +102,7 @@ CATEGORY_NAMES = {
     "leatherworking": "Leatherworking",
     "lockboxes": "Lockboxes",
     "ore": "Ore, Bars & Stone",
-    "profession_supplies": "Shared Profession Supplies",
+    "profession_supplies": "Shared Crafting Reagents",
     "tailoring": "Tailoring",
     "trinkets": "Trinkets",
     "weapons": "Weapons",

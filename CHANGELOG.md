@@ -1,5 +1,22 @@
 # Changelog
 
+## 1.2.0-beta.3 - 2026-08-12
+
+- Made valid Smart Deposit profile edits save automatically and survive
+  `/reload`; **Save Now** remains available as an explicit confirmation.
+- Made exact item routes override category routes and specific-expansion
+  category routes override **All Expansions** fallbacks.
+- Changed equal-priority routing conflicts to identify both destination tabs
+  and leave the conflicted item in the player's bags.
+- Replaced broad **Shared Profession Supplies** assignment with the smaller,
+  reviewed **Shared Crafting Reagents** set.
+- Assigned obvious parchment, vellum, dye, vial, and similar profession
+  supplies to intuitive player-facing categories.
+- Added a searchable **Category Reference** to Advanced settings, including
+  exact item-ID lookup and the complete Shared Crafting Reagents list.
+- Added checkbox outlines so unchecked expansion filters remain visible while
+  selected filters retain clear contrast.
+
 ## 1.2.0-beta.2 - 2026-08-12
 
 - Replaced the ambiguous Smart Deposit action with separate **Deposit This
