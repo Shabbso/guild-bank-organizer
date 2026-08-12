@@ -648,6 +648,13 @@ assert(addon:ClassifyDepositItem({
     bagFamily = 128,
 }) == "armor")
 assert(addon:GetGeneratedProfessionCategory(72988) == nil)
+assert(addon:GetGeneratedProfessionCategory(9210) == "tailoring")
+for _, itemID in ipairs({ 1165, 8547, 40677, 67435 }) do
+    local record = addon:GetProfessionReferenceItem(itemID)
+    assert(record.status == "excluded")
+    assert(addon:SearchProfessionReference(tostring(itemID))[1] == record)
+    assert(#addon:SearchProfessionReference(record.name) == 0)
+end
 local spiritDustExpansion, spiritDustEvidence =
     addon:ResolveDepositExpansion(74249, 0, Enum.ItemClass.Tradegoods)
 assert(spiritDustExpansion == 4)

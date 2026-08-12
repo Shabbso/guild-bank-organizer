@@ -20,6 +20,13 @@ class TaxonomyPolicyTests(unittest.TestCase):
         self.assertEqual(CURATED_CATEGORY_BY_ITEM[37602], "enchanting")
         self.assertEqual(CURATED_CATEGORY_BY_ITEM[2604], "tailoring")
 
+    def test_ghost_dye_has_the_tailoring_owner(self):
+        self.assertEqual(CURATED_CATEGORY_BY_ITEM[9210], "tailoring")
+
+    def test_reviewed_non_public_records_are_explicit(self):
+        for item_id in (1165, 8547, 40677, 67435):
+            self.assertIn(item_id, EXCLUDED_ITEM_REASONS)
+
     def test_shared_is_allowlist_only(self):
         generated = GeneratedCategory(
             "profession_supplies",

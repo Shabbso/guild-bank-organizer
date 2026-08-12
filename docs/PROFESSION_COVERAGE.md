@@ -8,9 +8,9 @@ metadata, specialized-bag evidence, and profession ownership.
 - Client build: `5.5.4.68806`
 - Profession recipe-graph item records: **5,920**
 - Total recipe-graph, direct-metadata, and Archaeology candidates: **11,783**
-- Public guild-bank-eligible records: **8,569**
-- Resolved by intrinsic item metadata: **7,634**
-- Resolved by generated profession data: **935**
+- Public guild-bank-eligible records: **8,464**
+- Resolved by intrinsic item metadata: **7,593**
+- Resolved by generated profession data: **871**
 - Eligible records without an organizational category: **0**
 
 Static eligibility excludes bind-on-pickup, quest-bound, Quest-class, and
@@ -24,29 +24,29 @@ instance can be bound even when its base item record is not.
 
 | Category | Intrinsic | Generated | Total |
 | --- | ---: | ---: | ---: |
-| Alchemy | 402 | 22 | 424 |
+| Alchemy | 399 | 21 | 420 |
 | Archaeology | 0 | 13 | 13 |
 | Armor | 2,129 | 0 | 2,129 |
 | Bags | 55 | 0 | 55 |
 | Battle Pets | 18 | 0 | 18 |
 | Blacksmithing | 236 | 31 | 267 |
 | Cloth | 45 | 0 | 45 |
-| Elemental | 62 | 6 | 68 |
-| Enchanting | 618 | 16 | 634 |
-| Engineering | 117 | 264 | 381 |
-| First Aid | 37 | 6 | 43 |
-| Fish & Cooking | 329 | 289 | 618 |
-| Food | 704 | 0 | 704 |
-| Herbs | 74 | 13 | 87 |
-| Inscription | 508 | 187 | 695 |
-| Jewels | 1,448 | 24 | 1,472 |
-| Leather | 82 | 0 | 82 |
-| Leatherworking | 221 | 27 | 248 |
+| Elemental | 61 | 6 | 67 |
+| Enchanting | 616 | 16 | 632 |
+| Engineering | 117 | 261 | 378 |
+| First Aid | 34 | 6 | 40 |
+| Fish & Cooking | 327 | 231 | 558 |
+| Food | 701 | 0 | 701 |
+| Herbs | 73 | 13 | 86 |
+| Inscription | 501 | 185 | 686 |
+| Jewels | 1,437 | 24 | 1,461 |
+| Leather | 78 | 0 | 78 |
+| Leatherworking | 221 | 26 | 247 |
 | Lockboxes | 4 | 0 | 4 |
-| Ore, Bars & Stone | 99 | 1 | 100 |
+| Ore, Bars & Stone | 96 | 1 | 97 |
 | Shared Profession Supplies | 0 | 19 | 19 |
-| Tailoring | 199 | 17 | 216 |
-| Trinkets | 28 | 0 | 28 |
+| Tailoring | 199 | 18 | 217 |
+| Trinkets | 27 | 0 | 27 |
 | Weapons | 219 | 0 | 219 |
 
 ## Shared Crafting Reagents
@@ -85,13 +85,118 @@ not public routing choices.
 
 | Item ID | Item | Exclusion reason |
 | ---: | --- | --- |
+| 1165 | Test Food | internal test item |
+| 4363 | Broken Modulator | broken internal record |
+| 8547 | Formula: Powerful Smelling Salts [PH] | placeholder item |
+| 13642 | Level 15 Test Gear Cloth - Mage/Priest/Warlock | internal test item |
+| 13643 | Level 15 Test Gear Leather - Druid/Shaman | internal test item |
+| 13644 | Level 15 Test Gear Leather - Hunter/Rogue | internal test item |
+| 13645 | Level 15 Test Gear Mail - Paladin/Warrior | internal test item |
+| 13646 | Level 20 Test Gear Cloth - Mage/Priest/Warlock | internal test item |
+| 13647 | Level 25 Test Gear Cloth - Mage/Priest/Warlock | internal test item |
+| 13648 | Level 30 Test Gear Cloth - Mage/Priest/Warlock | internal test item |
+| 13649 | Level 35 Test Gear Cloth - Mage/Priest/Warlock | internal test item |
+| 13650 | Level 40 Test Gear Cloth - Mage/Priest/Warlock | internal test item |
+| 13651 | Level 45 Test Gear Cloth - Mage/Priest/Warlock | internal test item |
+| 13652 | Level 50 Test Gear Cloth - Mage/Priest/Warlock | internal test item |
+| 13653 | Level 55 Test Gear Cloth - Mage/Priest/Warlock | internal test item |
+| 13654 | Level 60 Test Gear Cloth - Mage/Priest/Warlock | internal test item |
+| 13655 | Level 65 Test Gear Cloth - Mage | internal test item |
+| 13656 | Level 20 Test Gear Mail - Paladin/Warrior | internal test item |
+| 13657 | Level 25 Test Gear Mail - Paladin/Warrior | internal test item |
+| 13658 | Level 30 Test Gear Mail - Paladin/Warrior | internal test item |
+| 13659 | Level 35 Test Gear Mail - Paladin/Warrior | internal test item |
+| 13660 | Level 20 Test Gear Leather - Druid/Shaman | internal test item |
+| 13661 | Level 25 Test Gear Leather - Druid/Shaman | internal test item |
+| 13662 | Level 30 Test Gear Leather - Druid/Shaman | internal test item |
+| 13663 | Level 35 Test Gear Leather - Druid/Shaman | internal test item |
+| 13664 | Level 20 Test Gear Leather - Hunter/Rogue | internal test item |
+| 13665 | Level 25 Test Gear Leather - Hunter/Rogue | internal test item |
+| 13666 | Level 30 Test Gear Leather - Hunter/Rogue | internal test item |
+| 13667 | Level 35 Test Gear Leather - Hunter/Rogue | internal test item |
+| 13668 | Level 40 Test Gear Leather - Druid | internal test item |
+| 13669 | Level 45 Test Gear Leather - Druid | internal test item |
+| 13670 | Level 50 Test Gear Leather - Druid | internal test item |
+| 13671 | Level 55 Test Gear Leather - Druid | internal test item |
+| 13672 | Level 60 Test Gear Leather - Druid | internal test item |
+| 13673 | Level 65 Test Gear Leather - Druid | internal test item |
+| 13674 | Level 40 Test Gear Leather - Rogue | internal test item |
+| 13675 | Level 45 Test Gear Leather - Rogue | internal test item |
+| 13676 | Level 50 Test Gear Leather - Rogue | internal test item |
+| 13677 | Level 55 Test Gear Leather - Rogue | internal test item |
+| 13678 | Level 60 Test Gear Leather - Rogue | internal test item |
+| 13679 | Level 65 Test Gear Leather - Rogue | internal test item |
+| 13680 | Level 40 Test Gear Plate - Paladin/Warrior | internal test item |
+| 13681 | Level 45 Test Gear Plate - Paladin/Warrior | internal test item |
+| 13682 | Level 50 Test Gear Plate - Paladin/Warrior | internal test item |
+| 13683 | Level 55 Test Gear Plate - Paladin/Warrior | internal test item |
+| 13684 | Level 60 Test Gear Plate - Paladin/Warrior | internal test item |
+| 13685 | Level 65 Test Gear Plate - Paladin | internal test item |
+| 13686 | Level 40 Test Gear Mail - Hunter | internal test item |
+| 13687 | Level 45 Test Gear Mail - Hunter | internal test item |
+| 13688 | Level 50 Test Gear Mail - Hunter | internal test item |
+| 13689 | Level 55 Test Gear Mail - Hunter | internal test item |
+| 13690 | Level 60 Test Gear Mail - Hunter | internal test item |
+| 13691 | Level 65 Test Gear Mail - Hunter | internal test item |
+| 13692 | Level 40 Test Gear Mail - Shaman | internal test item |
+| 13693 | Level 45 Test Gear Mail - Shaman | internal test item |
+| 13694 | Level 50 Test Gear Mail - Shaman | internal test item |
+| 13695 | Level 55 Test Gear Mail - Shaman | internal test item |
+| 13696 | Level 60 Test Gear Mail - Shaman | internal test item |
+| 13697 | Level 65 Test Gear Mail - Shaman | internal test item |
+| 20499 | Broken Silithid Chitin | broken internal record |
 | 23418 | Test Sapper Charge | internal test item |
+| 23684 | Crystal Infused Bandage [PH] | placeholder item |
+| 23696 | [PH] Potion of Heightened Senses [DEP] | placeholder item |
+| 23698 | [PH] Nature Resist Potion [DEP] | placeholder item |
+| 28388 | TCHILTON TEST RUBY | internal test item |
+| 28389 | TCHILTON TEST DAWNSTONE | internal test item |
+| 34465 | Test Firebloom | internal test item |
+| 34467 | Test Handful of Fel Iron Bolts | internal test item |
 | 34476 | Broken Engine Part | broken internal record |
+| 34840 | Broken Spyglass | broken internal record |
+| 35485 | Goblin Rocket Launcher [PH] | placeholder item |
 | 35499 | Ninja Grenade [PH] | placeholder item |
+| 35626 | Eternal Mana [PH] | placeholder item |
+| 35715 | Deprecated Glyph of Venomous Mana [PH] | placeholder item |
+| 37301 | Deprecated Test Glyph | internal test item |
+| 37550 | DEPRECATED Test Glyph 2 | internal test item |
+| 37551 | DEPRECATED Test Glyph 3 [PH] | placeholder item |
+| 38292 | Test Living Ruby | internal test item |
+| 38498 | QA Test Blank Purple Gem | internal test item |
+| 38499 | QA Test Blank Blue Gem | internal test item |
+| 38500 | QA Test Blank Red Gem | internal test item |
+| 38501 | QA Test Blank Yellow Gem | internal test item |
+| 38502 | QA Test Blank Orange Gem | internal test item |
+| 38503 | QA Test Blank Green Gem | internal test item |
+| 38641 | Deprecated Frostweave Bandage [PH] | placeholder item |
+| 39304 | Glyph of Natural Force [PH] | placeholder item |
+| 39585 | Deprecated Glyph of Wild Endurance [PH] | placeholder item |
+| 39586 | Derecated Glyph of Moonfire (Kyle Test) [PH] | placeholder item |
+| 40677 | Crafty Potion PLACEHOLDER | placeholder item |
 | 41178 | ZX-5103 Mechanical Suit | internal test item |
+| 41374 | [PH] Glass of Red Wine | placeholder item |
+| 43098 | Ochre Pigment [PH] | placeholder item |
 | 43614 | Broken Wrath Elixir | broken internal record |
 | 43620 | Broken Spellpower Elixir | broken internal record |
 | 43621 | Broken Noggenfogger Elixir | broken internal record |
+| 44119 | Recipe: Big Bear Steak [PH] | placeholder item |
+| 49627 | Broken Fishbones | broken internal record |
+| 60891 | Pat Test Hydraulic | internal test item |
+| 60893 | Pat Test Cogwheel | internal test item |
+| 67435 | Loot-A-Rang (INTERNAL ONLY) | internal-only record |
+| 72164 | Type1 Leather [PH] | placeholder item |
+| 72165 | Type2 Leather [PH] | placeholder item |
+| 72174 | Type3 Leather [PH] | placeholder item |
+| 72175 | Type4 Leather [PH] | placeholder item |
+| 76747 | Scaling Food (TEST) | internal test item |
+| 79119 | Test Glyph 1 | internal test item |
+| 79121 | Item A [DO NOT TEST OR LOCALIZE] | internal test item |
+| 79122 | Item B [DO NOT TEST OR LOCALIZE] | internal test item |
+| 79123 | Item C [DO NOT TEST OR LOCALIZE] | internal test item |
+| 80824 | Sha Crystal (TEST VERSION) [PH] | placeholder item |
+| 82396 | Recipe: Format Test | internal test item |
+| 86561 | Test Cookbook | internal test item |
 
 ## Method and boundaries
 
