@@ -27,7 +27,13 @@ local itemDatabase = {
     [4359] = { name = "Handful of Copper Bolts", quality = 1, itemLevel = 10, maxStack = 20, sellPrice = 1, classID = 7, subclassID = 1, bagFamily = 128, expansionID = 0 },
     [2581] = { name = "Heavy Linen Bandage", quality = 1, itemLevel = 20, maxStack = 20, sellPrice = 1, classID = 0, subclassID = 7, expansionID = 0 },
     [4408] = { name = "Schematic: Mechanical Squirrel Box", quality = 1, itemLevel = 15, maxStack = 1, sellPrice = 1, classID = 9, subclassID = 3, bagFamily = 128, expansionID = 0 },
+    [785] = { name = "Mageroyal", quality = 1, itemLevel = 1, maxStack = 20, sellPrice = 1, classID = 7, subclassID = 9, expansionID = 0 },
+    [2604] = { name = "Red Dye", quality = 1, itemLevel = 1, maxStack = 20, sellPrice = 1, classID = 7, subclassID = 11, expansionID = 0 },
     [3371] = { name = "Crystal Vial", quality = 1, itemLevel = 5, maxStack = 20, sellPrice = 1, classID = 7, subclassID = 11, bagFamily = 16, expansionID = 0 },
+    [37602] = { name = "Ruined Vellum", quality = 1, itemLevel = 1, maxStack = 20, sellPrice = 1, classID = 7, subclassID = 11, expansionID = 2 },
+    [39354] = { name = "Light Parchment", quality = 1, itemLevel = 1, maxStack = 20, sellPrice = 1, classID = 7, subclassID = 11, expansionID = 2 },
+    [52078] = { name = "Chaos Orb", quality = 1, itemLevel = 1, maxStack = 20, sellPrice = 1, classID = 7, subclassID = 11, expansionID = 3 },
+    [23418] = { name = "Test Sapper Charge", quality = 1, itemLevel = 1, maxStack = 20, sellPrice = 1, classID = 7, subclassID = 11, expansionID = 1 },
     [79868] = { name = "Pandaren Pottery Shard", quality = 1, itemLevel = 1, maxStack = 20, sellPrice = 1, classID = 7, subclassID = 11, expansionID = 254 },
     [83064] = { name = "Spinefish", quality = 1, itemLevel = 1, maxStack = 20, sellPrice = 1, classID = 7, subclassID = 11 },
     [103641] = { name = "Singing Crystal", quality = 1, itemLevel = 1, maxStack = 20, sellPrice = 1, classID = 0, subclassID = 5 },
@@ -49,6 +55,17 @@ local function makeItem(itemID, count)
         link = itemLink(itemID),
         count = count,
         texture = itemID,
+    }
+end
+
+local function readTestItem(itemID)
+    local info = assert(itemDatabase[itemID], "missing test item " .. itemID)
+    return {
+        itemID = itemID,
+        classID = info.classID,
+        subclassID = info.subclassID,
+        equipLoc = info.equipLoc or "",
+        bagFamily = info.bagFamily or 0,
     }
 end
 
@@ -542,6 +559,25 @@ assert(addon:ClassifyDepositItem({
     classID = 7,
     subclassID = 5,
 }) == "cloth")
+assert(select(1, addon:ClassifyDepositItem(readTestItem(3371))) == "alchemy")
+assert(select(1, addon:ClassifyDepositItem(readTestItem(2604))) == "tailoring")
+assert(select(1, addon:ClassifyDepositItem(readTestItem(39354))) == "inscription")
+assert(select(1, addon:ClassifyDepositItem(readTestItem(37602))) == "enchanting")
+assert(select(1, addon:ClassifyDepositItem(readTestItem(52078))) == "profession_supplies")
+assert(select(1, addon:ClassifyDepositItem(readTestItem(23418))) == nil)
+assert(addon:GetDepositCategoryName("profession_supplies") == "Shared Crafting Reagents")
+
+local vialReference = assert(addon:DescribeProfessionReference(3371))
+assert(vialReference.name == "Crystal Vial")
+assert(vialReference.categoryKey == "alchemy")
+assert(vialReference.expansionName == "Classic")
+local generatedVialReference = addon:GetProfessionReferenceItem(3371)
+assert(generatedVialReference.expansionName == nil)
+assert(generatedVialReference.exactTabs == nil)
+local excludedReference = assert(addon:DescribeProfessionReference(23418))
+assert(excludedReference.status == "excluded")
+local shared = addon:GetSharedCraftingReagents()
+assert(#shared == 19)
 assert(addon:ClassifyDepositItem({
     itemID = 999,
     classID = 4,
@@ -559,7 +595,7 @@ local spinefishCategory, spinefishEvidence = addon:ClassifyDepositItem({
     subclassID = 11,
 })
 assert(spinefishCategory == "fish")
-assert(spinefishEvidence == "curated item ID")
+assert(spinefishEvidence == "curated gameplay item ID")
 assert(addon:ClassifyDepositItem({
     itemID = 103641,
     classID = 0,
@@ -571,7 +607,7 @@ local vellumCategory, vellumEvidence = addon:ClassifyDepositItem({
     subclassID = 14,
 })
 assert(vellumCategory == "enchanting")
-assert(vellumEvidence == "curated item ID")
+assert(vellumEvidence == "curated gameplay item ID")
 local pigmentCategory, pigmentEvidence = addon:ClassifyDepositItem({
     itemID = 79251,
     classID = 7,
@@ -586,7 +622,7 @@ local inkCategory = addon:ClassifyDepositItem({
     subclassID = 1,
     bagFamily = 16,
 })
-assert(inkCategory == "inscription")
+assert(inkCategory == "engineering")
 local boltsCategory = addon:ClassifyDepositItem({
     itemID = 4359,
     classID = 7,
@@ -704,7 +740,7 @@ GuildBankOrganizerDB = {
                 categories = { enchanting = true },
                 allExpansions = false,
                 expansions = { [4] = true },
-                exactItemIDs = {},
+                exactItemIDs = { [3371] = true },
             },
         },
     },
@@ -712,6 +748,10 @@ GuildBankOrganizerDB = {
 fire("ADDON_LOADED", addonName)
 assert(GuildBankOrganizerDB.schema == 5)
 assert(addon:GetDepositProfile(2, false).enabled)
+local exactTabs = addon:GetExactDepositProfileTabs(3371)
+assert(#exactTabs == 1 and exactTabs[1] == 2)
+local exactVialReference = assert(addon:DescribeProfessionReference(3371))
+assert(#exactVialReference.exactTabs == 1 and exactVialReference.exactTabs[1] == 2)
 addon:GetDepositProfiles(false)[2] = nil
 fire("PLAYER_LOGIN")
 fire("GUILDBANKFRAME_OPENED")

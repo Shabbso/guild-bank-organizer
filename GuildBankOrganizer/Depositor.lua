@@ -122,6 +122,28 @@ function GBO:GetDepositProfile(tab, create)
     return profile
 end
 
+function GBO:GetExactDepositProfileTabs(itemID)
+    itemID = tonumber(itemID)
+    if not itemID then
+        return {}
+    end
+
+    local exactTabs = {}
+    local profiles = self:GetDepositProfiles(false) or {}
+    for tab, profile in pairs(profiles) do
+        tab = tonumber(tab)
+        if tab
+            and type(profile) == "table"
+            and type(profile.exactItemIDs) == "table"
+            and profile.exactItemIDs[itemID]
+        then
+            table.insert(exactTabs, tab)
+        end
+    end
+    table.sort(exactTabs)
+    return exactTabs
+end
+
 local function expansionSetsOverlap(leftAll, left, rightAll, right)
     if leftAll or rightAll then
         return true
