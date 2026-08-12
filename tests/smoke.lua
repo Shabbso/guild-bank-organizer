@@ -22,6 +22,13 @@ local itemDatabase = {
     [72988] = { name = "Windwool Cloth", quality = 1, itemLevel = 1, maxStack = 20, sellPrice = 1, classID = 7, subclassID = 5, expansionID = 254 },
     [500] = { name = "Test Dust", quality = 1, itemLevel = 1, maxStack = 20, sellPrice = 1, classID = 7, subclassID = 12 },
     [74249] = { name = "Spirit Dust", quality = 1, itemLevel = 1, maxStack = 20, sellPrice = 1, classID = 7, subclassID = 12, expansionID = 0 },
+    [79251] = { name = "Shadow Pigment", quality = 1, itemLevel = 86, maxStack = 20, sellPrice = 1, classID = 7, subclassID = 11, bagFamily = 16, expansionID = 254 },
+    [79254] = { name = "Ink of Dreams", quality = 1, itemLevel = 85, maxStack = 20, sellPrice = 1, classID = 7, subclassID = 1, bagFamily = 16, expansionID = 254 },
+    [4359] = { name = "Handful of Copper Bolts", quality = 1, itemLevel = 10, maxStack = 20, sellPrice = 1, classID = 7, subclassID = 1, bagFamily = 128, expansionID = 0 },
+    [2581] = { name = "Heavy Linen Bandage", quality = 1, itemLevel = 20, maxStack = 20, sellPrice = 1, classID = 0, subclassID = 7, expansionID = 0 },
+    [4408] = { name = "Schematic: Mechanical Squirrel Box", quality = 1, itemLevel = 15, maxStack = 1, sellPrice = 1, classID = 9, subclassID = 3, bagFamily = 128, expansionID = 0 },
+    [3371] = { name = "Crystal Vial", quality = 1, itemLevel = 5, maxStack = 20, sellPrice = 1, classID = 7, subclassID = 11, bagFamily = 16, expansionID = 0 },
+    [79868] = { name = "Pandaren Pottery Shard", quality = 1, itemLevel = 1, maxStack = 20, sellPrice = 1, classID = 7, subclassID = 11, expansionID = 254 },
     [83064] = { name = "Spinefish", quality = 1, itemLevel = 1, maxStack = 20, sellPrice = 1, classID = 7, subclassID = 11 },
     [103641] = { name = "Singing Crystal", quality = 1, itemLevel = 1, maxStack = 20, sellPrice = 1, classID = 0, subclassID = 5 },
     [109999] = { name = "Unclassified Material", quality = 1, itemLevel = 1, maxStack = 20, sellPrice = 1, classID = 7, subclassID = 11 },
@@ -432,6 +439,14 @@ end
 
 C_Item = {
     GetItemInfo = GetItemInfo,
+    GetItemFamily = function(item)
+        local itemID = tonumber(item)
+        if not itemID and type(item) == "string" then
+            itemID = tonumber(string.match(item, "item:(%d+)"))
+        end
+        local info = itemDatabase[itemID]
+        return info and info.bagFamily or 0
+    end,
     GetItemInfoInstant = function(item)
         local itemID = tonumber(item)
         if not itemID and type(item) == "string" then
@@ -512,6 +527,7 @@ end
 
 loadAddonFile("GuildBankOrganizer/Core.lua")
 loadAddonFile("GuildBankOrganizer/ExpansionData.lua")
+loadAddonFile("GuildBankOrganizer/ProfessionData.lua")
 loadAddonFile("GuildBankOrganizer/Categories.lua")
 loadAddonFile("GuildBankOrganizer/Scanner.lua")
 loadAddonFile("GuildBankOrganizer/Diagnostics.lua")
@@ -556,6 +572,82 @@ local vellumCategory, vellumEvidence = addon:ClassifyDepositItem({
 })
 assert(vellumCategory == "enchanting")
 assert(vellumEvidence == "curated item ID")
+local pigmentCategory, pigmentEvidence = addon:ClassifyDepositItem({
+    itemID = 79251,
+    classID = 7,
+    subclassID = 11,
+    bagFamily = 16,
+})
+assert(pigmentCategory == "inscription")
+assert(pigmentEvidence == "MoP profession item data")
+local inkCategory = addon:ClassifyDepositItem({
+    itemID = 79254,
+    classID = 7,
+    subclassID = 1,
+    bagFamily = 16,
+})
+assert(inkCategory == "inscription")
+local boltsCategory = addon:ClassifyDepositItem({
+    itemID = 4359,
+    classID = 7,
+    subclassID = 1,
+    bagFamily = 128,
+})
+assert(boltsCategory == "engineering")
+assert(addon:ClassifyDepositItem({
+    itemID = 2581,
+    classID = 0,
+    subclassID = 7,
+}) == "first_aid")
+assert(addon:ClassifyDepositItem({
+    itemID = 4408,
+    classID = 9,
+    subclassID = 3,
+    bagFamily = 128,
+}) == "engineering")
+assert(addon:ClassifyDepositItem({
+    itemID = 3371,
+    classID = 7,
+    subclassID = 11,
+    bagFamily = 16,
+}) == "profession_supplies")
+assert(addon:ClassifyDepositItem({
+    itemID = 79868,
+    classID = 7,
+    subclassID = 11,
+}) == "archaeology")
+local professionCoverage = addon:GetProfessionCoverageSummary()
+assert(professionCoverage.sourceBuild == "5.5.4.68806")
+assert(professionCoverage.eligibleItems > 8000)
+assert(professionCoverage.generatedItems > 600)
+assert(professionCoverage.unclassifiedItems == 0)
+bags[0][16] = makeItem(79251, 2)
+local shadowPigmentSlot = addon:ReadDepositBagSlot(0, 16)
+assert(shadowPigmentSlot.bagFamily == 16)
+assert(shadowPigmentSlot.categoryKey == "inscription")
+assert(shadowPigmentSlot.categoryEvidence == "MoP profession item data")
+bags[0][16] = nil
+local futurePigmentCategory, futurePigmentEvidence = addon:ClassifyDepositItem({
+    itemID = 999999,
+    classID = 7,
+    subclassID = 11,
+    bagFamily = 16,
+})
+assert(futurePigmentCategory == "inscription")
+assert(futurePigmentEvidence == "specialized bag family")
+assert(addon:ClassifyDepositItem({
+    itemID = 999998,
+    classID = 1,
+    subclassID = 0,
+    bagFamily = 16,
+}) == "bags")
+assert(addon:ClassifyDepositItem({
+    itemID = 999997,
+    classID = 4,
+    subclassID = 1,
+    bagFamily = 128,
+}) == "armor")
+assert(addon:GetGeneratedProfessionCategory(72988) == nil)
 local spiritDustExpansion, spiritDustEvidence =
     addon:ResolveDepositExpansion(74249, 0, Enum.ItemClass.Tradegoods)
 assert(spiritDustExpansion == 4)

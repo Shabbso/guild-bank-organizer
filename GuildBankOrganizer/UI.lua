@@ -1026,7 +1026,7 @@ local function createDepositSettingsFrame()
     local frame = createPanel(
         "GuildBankOrganizerDepositSettingsFrame",
         470,
-        620,
+        670,
         "Guild Bank Organizer  /  Smart Deposit"
     )
     anchorBesideGuildBank(frame)
@@ -1086,6 +1086,8 @@ local function createDepositSettingsFrame()
     frame.CategoryChecks = {}
     local categories = GBO:GetDepositCategoryCatalog()
     local rowCount = math.max(1, math.ceil(#categories / 2))
+    local categoryTop = -170
+    local categoryRowSpacing = 22
     local columnX = {18, 238}
     for index, category in ipairs(categories) do
         local column = math.floor((index - 1) / rowCount) + 1
@@ -1094,7 +1096,7 @@ local function createDepositSettingsFrame()
             frame,
             category.name,
             columnX[column],
-            -170 - (row * 25),
+            categoryTop - (row * categoryRowSpacing),
             function(self)
                 if self:GetChecked() then
                     frame.EnabledCheck:SetChecked(true)
@@ -1120,12 +1122,13 @@ local function createDepositSettingsFrame()
         frame.CategoryChecks[category.key] = check
     end
 
-    createLabel(frame, "Expansion", 20, -408)
+    local expansionY = categoryTop - (rowCount * categoryRowSpacing) - 8
+    createLabel(frame, "Expansion", 20, expansionY)
     frame.AllExpansionsCheck = createCheckBox(
         frame,
         "All",
         78,
-        -405,
+        expansionY + 3,
         function(check)
             if check:GetChecked() then
                 for _, expansionCheck in pairs(frame.ExpansionChecks or {}) do
@@ -1141,7 +1144,7 @@ local function createDepositSettingsFrame()
             frame,
             expansion.shortName,
             expansionX[index],
-            -405,
+            expansionY + 3,
             function(self)
                 if self:GetChecked() then
                     frame.AllExpansionsCheck:SetChecked(false)
@@ -1152,15 +1155,16 @@ local function createDepositSettingsFrame()
         frame.ExpansionChecks[expansion.id] = check
     end
     local expansionHelp = frame:CreateFontString(nil, "OVERLAY", "GameFontDisableSmall")
-    expansionHelp:SetPoint("TOPLEFT", 20, -435)
-    expansionHelp:SetPoint("TOPRIGHT", -20, -435)
+    expansionHelp:SetPoint("TOPLEFT", 20, expansionY - 27)
+    expansionHelp:SetPoint("TOPRIGHT", -20, expansionY - 27)
     expansionHelp:SetJustifyH("LEFT")
     expansionHelp:SetText(
         "Use Mists for current-expansion materials, or choose several eras for an older-material tab."
     )
 
-    createLabel(frame, "Exact item IDs (optional)", 20, -470)
-    frame.ExactItemsInput = createInput(frame, 250, 170, -464)
+    local exactItemsY = expansionY - 62
+    createLabel(frame, "Exact item IDs (optional)", 20, exactItemsY)
+    frame.ExactItemsInput = createInput(frame, 250, 170, exactItemsY + 6)
     frame.ExactItemsInput:SetJustifyH("LEFT")
     frame.ExactItemsInput:SetScript("OnTextChanged", function(self)
         if not frame.LoadingProfile
@@ -1170,8 +1174,8 @@ local function createDepositSettingsFrame()
         end
     end)
     local exactHelp = frame:CreateFontString(nil, "OVERLAY", "GameFontDisableSmall")
-    exactHelp:SetPoint("TOPLEFT", 20, -496)
-    exactHelp:SetPoint("TOPRIGHT", -20, -496)
+    exactHelp:SetPoint("TOPLEFT", 20, exactItemsY - 26)
+    exactHelp:SetPoint("TOPRIGHT", -20, exactItemsY - 26)
     exactHelp:SetJustifyH("LEFT")
     exactHelp:SetText(
         "Comma-separated IDs override categories. Useful for unusual lockboxes or crafted items."
@@ -1257,7 +1261,7 @@ local function createDepositSettingsFrame()
                         ))
                     else
                         frame.StatusText:SetText(string.format(
-                            "%s (item %s) is a material WoW does not place in one of the supported categories. Add its item ID or report it so GBO can add a rule.",
+                            "%s (item %s) is not covered by this MoP profession catalog. Add its item ID temporarily and report it so the generated rules can be audited.",
                             item and item.name or "A bag material",
                             item and item.itemID or "?"
                         ))

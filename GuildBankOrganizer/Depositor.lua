@@ -13,6 +13,7 @@ local pickupContainerItem = C_Container and C_Container.PickupContainerItem
 local splitContainerItem = C_Container and C_Container.SplitContainerItem
 local getItemInfoInstant = C_Item and C_Item.GetItemInfoInstant
 local getItemInfo = (C_Item and C_Item.GetItemInfo) or GetItemInfo
+local getItemFamily = C_Item and C_Item.GetItemFamily
 
 local LEGACY_CATEGORY_KEYS = {
     ["7:4"] = "jewels",
@@ -285,6 +286,9 @@ local function readBagSlot(bag, slot)
         bound = info.isBound and true or false,
         classID = classID,
         subclassID = subclassID,
+        bagFamily = getItemFamily
+            and getItemFamily(info.hyperlink or itemID)
+            or 0,
         equipLoc = equipLoc ~= "" and equipLoc or infoEquipLoc,
         expansionID = resolvedExpansionID,
         expansionEvidence = expansionEvidence,

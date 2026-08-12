@@ -91,16 +91,28 @@ when the bag source and bank destination are provably unchanged. Nothing moves
 until the player clicks **Smart Deposit**.
 
 Category rules are based on the client item class, subclass, equipment slot,
-source-backed item era, or an explicit item-ID list. MoP Classic can report
+profession recipe graph, specialized-bag metadata, source-backed item era, or
+an explicit item-ID list. MoP Classic can report
 the unusable expansion value `254`; GBO resolves the era from Blizzard client
 item data bundled as compact correction ranges. Hover a category in setup to
-see the exact rule. The client combines raw fish, meat, and other cooking ingredients
-in one Trade Goods subclass, so that public category is intentionally named
-**Fish & Raw Cooking**. Known metadata exceptions are curated by item ID; for
-example, Spinefish is included even though WoW exposes it as an
-Alchemy-oriented reagent rather than ordinary Cooking material. It also does
-not expose a universal “crafted by
-Blacksmithing” field, so non-armor Blacksmithing items use exact item IDs.
+see the exact rule. The generated MoP profession catalog covers pigments,
+inks, Engineering parts, profession recipes, bandages, oils, dyes, and other
+objects that the game's broad item class cannot identify reliably. Items used
+by several professions without one defensible owner use **Shared Profession
+Supplies**, avoiding overlapping tab routes. The client combines raw fish,
+meat, and other cooking ingredients, so that public category is intentionally
+named **Fish & Cooking**. Armor, Weapons, Cloth, Ore, Leather, Herbs, and
+Elemental materials keep their intrinsic categories even when a profession
+creates or consumes them.
+
+Archaeology profiles cover its bankable keystone items. Archaeology fragments
+are currencies rather than bag items, so there is nothing for Smart Deposit to
+move for those currencies.
+
+The generated audit currently gives every statically bank-eligible item in its
+MoP profession universe one organizational category. See
+[`docs/PROFESSION_COVERAGE.md`](docs/PROFESSION_COVERAGE.md) for the exact
+counts, sources, limitations, shared-item list, and reproduction command.
 
 If a scan finds no deposits, the setup status explains whether the profile is
 paused, an expansion filter excluded matching items, matching items are bound
@@ -182,6 +194,7 @@ for file in GuildBankOrganizer/*.lua tests/*.lua; do
   npx --yes luaparse "$file" >/dev/null
 done
 npx --yes --package=fengari-node-cli fengari tests/smoke.lua
+python3 scripts/generate_profession_data.py
 ```
 
 Build a release:

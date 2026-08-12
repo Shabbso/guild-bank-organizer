@@ -1,5 +1,29 @@
 # Changelog
 
+## 1.2.0-beta.1 - 2026-08-12
+
+- Replaced the small Smart Deposit exception list with a generated profession
+  catalog derived from the MoP Classic item, profession, reagent, created-item,
+  and specialized-bag client data.
+- Fixed Shadow Pigment, Misty Pigment, Ink of Dreams, Starlight Ink, and the
+  full generated set of Inscription pigments, inks, scrolls, and supplies.
+- Added public Engineering, Tailoring, Leatherworking, First Aid, Archaeology,
+  and Shared Profession Supplies categories.
+- Added deterministic coverage for profession recipes and non-equipment
+  products while preserving Armor, Weapons, Cloth, Ore, Leather, Herbs, and
+  Elemental as their own categories.
+- Added a neutral category for genuinely multi-profession materials so one bag
+  item cannot overlap several tab routes.
+- Added Archaeology's 13 bankable keystone items; Archaeology fragment
+  currencies remain outside Smart Deposit because they are not bag items.
+- Added a conservative specialized-bag fallback for future unknown item IDs.
+- Added a reproducible coverage report: 8,576 statically bank-eligible MoP
+  profession candidates categorized, with zero uncovered records.
+- Added regression coverage for Shadow Pigment, Ink of Dreams, Engineering
+  parts and schematics, First Aid bandages, Archaeology keystones, shared
+  supplies, generated coverage, and live bag-family reads.
+- Expanded the Smart Deposit setup panel to fit the new categories cleanly.
+
 ## 1.1.1 - 2026-08-11
 
 - Fixed Smart Deposit expansion filtering on MoP Classic clients that report
