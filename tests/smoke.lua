@@ -878,6 +878,79 @@ assert(GuildBankOrganizerDepositSettingsFrame.EnabledCheck:GetChecked())
 addon:HideOrganizerUI()
 runTimers()
 
+-- A current-tab deposit must exclude other configured tabs from both the
+-- operation and its reported totals, while the all-tabs preview includes
+-- every enabled destination.
+numGuildBankTabs = 2
+currentGuildBankTab = 1
+slots[1] = {
+    [1] = makeItem(72988, 10),
+}
+slots[2] = {}
+bags[0] = {
+    [1] = makeItem(72988, 15),
+    [2] = makeItem(500, 7),
+}
+assert(addon:SaveDepositProfile(
+    1,
+    true,
+    "Tailoring",
+    { cloth = true },
+    false,
+    { [4] = true },
+    {}
+))
+runTimers()
+assert(addon:SaveDepositProfile(
+    2,
+    true,
+    "Enchanting",
+    { enchanting = true },
+    false,
+    { [4] = true },
+    {}
+))
+runTimers()
+
+local tabScope = assert(addon:GetDepositPlanScope(1))
+assert(tabScope.totalItems == 15)
+assert(tabScope.totalMoves == 2)
+assert(tabScope.destinationCount == 1)
+
+local allScope = assert(addon:GetDepositPlanScope())
+assert(allScope.totalItems == 22)
+assert(allScope.totalMoves == 3)
+assert(allScope.destinationCount == 2)
+
+assert(addon:StartDeposit(1))
+runTimers()
+assert(bags[0][1] == nil)
+assert(bags[0][2] and bags[0][2].itemID == 500)
+assert(string.find(addon.lastReport, "planned=2", 1, true))
+assert(string.find(addon.lastReport, "items=15", 1, true))
+
+-- Restore the original one-tab fixture for the full Smart Deposit lifecycle.
+numGuildBankTabs = 1
+currentGuildBankTab = 1
+addon:GetDepositProfiles(false)[2] = nil
+slots[1] = {
+    [1] = makeItem(72988, 10),
+}
+bags[0] = {
+    [1] = makeItem(72988, 15),
+    [2] = makeItem(500, 7),
+}
+assert(addon:SaveDepositProfile(
+    1,
+    true,
+    "Tailoring & Enchanting",
+    { cloth = true, enchanting = true },
+    false,
+    { [4] = true },
+    {}
+))
+runTimers()
+
 local depositPlan = addon:GetDepositPlan()
 assert(depositPlan and depositPlan.totalMoves == 3)
 assert(depositPlan.totalItems == 22)
@@ -894,7 +967,7 @@ assert(string.find(addon.lastReport, "smart deposit report", 1, true))
 assert(string.find(addon.lastReport, "result=PASS", 1, true))
 assert(string.find(addon.lastReport, "confirmed=3", 1, true))
 assert(string.find(addon.lastReport, "retries=1", 1, true))
-assert(#GuildBankOrganizerDB.runs == 5)
+assert(#GuildBankOrganizerDB.runs == 6)
 assert(GuildBankOrganizerDB.runs[1].type == "deposit")
 assert(GuildBankOrganizerDB.runs[1].averageMoveSeconds < 0.20)
 

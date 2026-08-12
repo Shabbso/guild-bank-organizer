@@ -670,8 +670,64 @@ local function buildDepositPlan()
     return plan
 end
 
+local function filterDepositPlan(plan, selectedTabs)
+    local filtered = {
+        builtAt = plan and plan.builtAt,
+        tabs = {},
+        order = {},
+        totalMoves = 0,
+        totalItems = 0,
+        totalStacks = 0,
+        skippedItems = 0,
+    }
+    if not plan then
+        return filtered
+    end
+
+    for _, plannedTab in ipairs(plan.order) do
+        if not selectedTabs or selectedTabs[plannedTab] then
+            local tabPlan = plan.tabs[plannedTab]
+            filtered.tabs[plannedTab] = tabPlan
+            table.insert(filtered.order, plannedTab)
+            filtered.totalMoves = filtered.totalMoves + tabPlan.moves
+            filtered.totalItems = filtered.totalItems + tabPlan.itemCount
+            filtered.totalStacks = filtered.totalStacks + tabPlan.sourceStacks
+            filtered.skippedItems = filtered.skippedItems + tabPlan.skippedItems
+        end
+    end
+    return filtered
+end
+
 function GBO:GetDepositPlan()
     return depositor.plan
+end
+
+function GBO:GetDepositPlanScope(tab)
+    local plan = depositor.plan
+    if not plan then
+        return nil
+    end
+
+    local selectedTabs
+    if tab ~= nil then
+        selectedTabs = {}
+        local selectedTab = tonumber(tab)
+        if selectedTab then
+            selectedTabs[selectedTab] = true
+        end
+    end
+    local scoped = filterDepositPlan(plan, selectedTabs)
+    local destinationCount = 0
+    for _, plannedTab in ipairs(scoped.order) do
+        if scoped.tabs[plannedTab].moves > 0 then
+            destinationCount = destinationCount + 1
+        end
+    end
+    return {
+        totalMoves = scoped.totalMoves,
+        totalItems = scoped.totalItems,
+        destinationCount = destinationCount,
+    }
 end
 
 function GBO:GetDepositPlanSummary()
@@ -1072,32 +1128,7 @@ function GBO:IssueDepositMove(move, isRetry)
 end
 
 local function selectedPlan()
-    local plan = buildDepositPlan()
-    if not depositor.selectedTabs then
-        return plan
-    end
-
-    local filtered = {
-        builtAt = plan.builtAt,
-        tabs = {},
-        order = {},
-        totalMoves = 0,
-        totalItems = 0,
-        totalStacks = 0,
-        skippedItems = 0,
-    }
-    for _, tab in ipairs(plan.order) do
-        if depositor.selectedTabs[tab] then
-            local tabPlan = plan.tabs[tab]
-            filtered.tabs[tab] = tabPlan
-            table.insert(filtered.order, tab)
-            filtered.totalMoves = filtered.totalMoves + tabPlan.moves
-            filtered.totalItems = filtered.totalItems + tabPlan.itemCount
-            filtered.totalStacks = filtered.totalStacks + tabPlan.sourceStacks
-            filtered.skippedItems = filtered.skippedItems + tabPlan.skippedItems
-        end
-    end
-    return filtered
+    return filterDepositPlan(buildDepositPlan(), depositor.selectedTabs)
 end
 
 local function finishVerification()
@@ -1236,6 +1267,7 @@ function GBO:StartDeposit(tab, refreshed)
         self:Print("No assigned bag items currently have guild-bank space.")
         return false
     end
+    local scopedPlan = filterDepositPlan(plan, selectedTabs)
 
     depositor.generation = depositor.generation + 1
     depositor.running = true
@@ -1243,15 +1275,15 @@ function GBO:StartDeposit(tab, refreshed)
     depositor.stage = "planning"
     depositor.startedAt = now()
     depositor.selectedTabs = selectedTabs
-    depositor.estimatedTotal = plan.totalMoves
-    depositor.estimatedRemaining = plan.totalMoves
+    depositor.estimatedTotal = scopedPlan.totalMoves
+    depositor.estimatedRemaining = scopedPlan.totalMoves
     depositor.issued = 0
     depositor.confirmed = 0
     depositor.depositedItems = 0
     depositor.totalSeconds = 0
     depositor.averageSeconds = nil
     depositor.retries = 0
-    depositor.skippedItems = plan.skippedItems
+    depositor.skippedItems = scopedPlan.skippedItems
     depositor.bagEvents = 0
     depositor.slotEvents = 0
     depositor.uiErrors = {}
@@ -1263,14 +1295,14 @@ function GBO:StartDeposit(tab, refreshed)
 
     addTimeline(string.format(
         "smart deposit started: %d planned moves for %d items; %.2fs quiet period",
-        plan.totalMoves,
-        plan.totalItems,
+        scopedPlan.totalMoves,
+        scopedPlan.totalItems,
         self.defaults.depositQuietPeriod
     ))
     self:Print(string.format(
         "Smart Deposit: %d items in %d planned deposits.",
-        plan.totalItems,
-        plan.totalMoves
+        scopedPlan.totalItems,
+        scopedPlan.totalMoves
     ))
     self:PlanNextDeposit()
     return true
