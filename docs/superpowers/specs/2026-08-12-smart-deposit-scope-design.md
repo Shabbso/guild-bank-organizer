@@ -1,7 +1,7 @@
 # Smart Deposit Scope Selection Design
 
 Date: 2026-08-12
-Status: Approved interaction design; awaiting written-spec review
+Status: Approved
 
 ## Background
 
