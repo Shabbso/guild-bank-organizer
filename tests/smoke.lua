@@ -182,7 +182,22 @@ local function addWidgetMethods(widget)
     function widget:SetClampedToScreen() end
     function widget:SetAutoFocus() end
     function widget:SetJustifyH() end
-    function widget:ClearFocus() end
+    function widget:ClearFocus()
+        local hadFocus = self.focused
+        self.focused = false
+        if hadFocus and self.scripts.OnEditFocusLost then
+            self.scripts.OnEditFocusLost(self)
+        end
+    end
+    function widget:SetFocus()
+        self.focused = true
+        if self.scripts.OnEditFocusGained then
+            self.scripts.OnEditFocusGained(self)
+        end
+    end
+    function widget:HasFocus()
+        return self.focused and true or false
+    end
     function widget:SetMultiLine() end
     function widget:SetFontObject() end
     function widget:SetNormalFontObject() end
@@ -190,7 +205,21 @@ local function addWidgetMethods(widget)
     function widget:SetWidth() end
     function widget:SetHeight() end
     function widget:SetTexture() end
-    function widget:SetColorTexture() end
+    function widget:SetColorTexture(red, green, blue, alpha)
+        self.color = { red, green, blue, alpha }
+    end
+    function widget:SetBackdrop(backdrop)
+        self.backdrop = backdrop
+    end
+    function widget:SetBackdropColor(red, green, blue, alpha)
+        self.backdropColor = { red, green, blue, alpha }
+    end
+    function widget:SetBackdropBorderColor(red, green, blue, alpha)
+        self.backdropBorderColor = { red, green, blue, alpha }
+    end
+    function widget:IsMouseOver()
+        return self.mouseOver and true or false
+    end
     function widget:SetMinMaxValues(minimum, maximum)
         self.minimum = minimum
         self.maximum = maximum
@@ -207,6 +236,9 @@ local function addWidgetMethods(widget)
     function widget:StopMovingOrSizing() end
     function widget:Enable()
         self.enabled = true
+        if self.scripts.OnEnable then
+            self.scripts.OnEnable(self)
+        end
     end
     function widget:Disable()
         self.enabled = false
@@ -1071,19 +1103,105 @@ bags[0] = {
     [2] = makeItem(500, 7),
 }
 
+addon:GetDepositProfiles(false)[1] = nil
 addon:ShowDepositSettingsUI()
 local depositSettings = GuildBankOrganizerDepositSettingsFrame
 assert(depositSettings.EnabledCheck:GetChecked())
-depositSettings.EnabledCheck.scripts.OnClick(depositSettings.EnabledCheck)
-assert(not depositSettings.EnabledCheck:GetChecked())
-depositSettings.EnabledCheck.scripts.OnClick(depositSettings.EnabledCheck)
+assert(depositSettings.SaveButton:GetText() == "Save Now")
+
+local uncheckedCloth = depositSettings.CategoryChecks.cloth
+assert(uncheckedCloth.Top and uncheckedCloth.Top:IsShown())
+assert(uncheckedCloth.Top.color and uncheckedCloth.Box.color)
+assert(
+    uncheckedCloth.Top.color[1] ~= uncheckedCloth.Box.color[1]
+        or uncheckedCloth.Top.color[2] ~= uncheckedCloth.Box.color[2]
+        or uncheckedCloth.Top.color[3] ~= uncheckedCloth.Box.color[3]
+)
+local restingBorder = {
+    uncheckedCloth.Top.color[1],
+    uncheckedCloth.Top.color[2],
+    uncheckedCloth.Top.color[3],
+    uncheckedCloth.Top.color[4],
+}
+uncheckedCloth.mouseOver = true
+uncheckedCloth.scripts.OnEnter(uncheckedCloth)
+assert(
+    uncheckedCloth.Top.color[1] ~= restingBorder[1]
+        or uncheckedCloth.Top.color[2] ~= restingBorder[2]
+        or uncheckedCloth.Top.color[3] ~= restingBorder[3]
+)
+uncheckedCloth.mouseOver = false
+uncheckedCloth.scripts.OnLeave(uncheckedCloth)
+
+depositSettings.CategoryChecks.herbs.scripts.OnClick(
+    depositSettings.CategoryChecks.herbs
+)
+local autosavedProfile = addon:GetDepositProfile(1, false)
+assert(autosavedProfile and autosavedProfile.enabled)
+assert(autosavedProfile.categories.herbs)
+assert(depositSettings.SaveState == "saved")
+assert(depositSettings.CategoryChecks.herbs.Mark:IsShown())
+assert(depositSettings.CategoryChecks.herbs.Mark.color[1] == 0.10)
+assert(depositSettings.CategoryChecks.herbs.Mark.color[2] == 0.78)
+assert(depositSettings.CategoryChecks.herbs.Mark.color[3] == 0.82)
+
+depositSettings.ExpansionChecks[0].scripts.OnClick(
+    depositSettings.ExpansionChecks[0]
+)
+autosavedProfile = addon:GetDepositProfile(1, false)
+assert(not autosavedProfile.allExpansions)
+assert(autosavedProfile.expansions[0])
+assert(depositSettings.SaveState == "saved")
+
+depositSettings.LabelInput:SetText("Classic Herbs")
+depositSettings.LabelInput.scripts.OnEnterPressed(depositSettings.LabelInput)
+assert(addon:GetDepositProfile(1, false).label == "Classic Herbs")
+
+depositSettings.ExactItemsInput:SetText("785")
+depositSettings.ExactItemsInput.scripts.OnEditFocusLost(
+    depositSettings.ExactItemsInput
+)
+autosavedProfile = addon:GetDepositProfile(1, false)
+assert(autosavedProfile.exactItemIDs[785])
+
+addon:HideOrganizerUI()
+local profileBeforeProgrammaticLoad = addon:GetDepositProfile(1, false)
+addon:ShowDepositSettingsUI()
+depositSettings = GuildBankOrganizerDepositSettingsFrame
+assert(addon:GetDepositProfile(1, false) == profileBeforeProgrammaticLoad)
+assert(not depositSettings.LoadingProfile)
+assert(depositSettings.TabInput:GetText() == "1")
 assert(depositSettings.EnabledCheck:GetChecked())
-depositSettings.EnabledCheck:SetChecked(true)
+assert(depositSettings.LabelInput:GetText() == "Classic Herbs")
+assert(depositSettings.CategoryChecks.herbs:GetChecked())
+assert(not depositSettings.AllExpansionsCheck:GetChecked())
+assert(depositSettings.ExpansionChecks[0]:GetChecked())
+assert(depositSettings.ExactItemsInput:GetText() == "785")
+
+local lastValidProfile = addon:GetDepositProfile(1, false)
+depositSettings.ExpansionChecks[0]:SetChecked(false)
+depositSettings.HeaderBackButton.scripts.OnClick()
+assert(depositSettings:IsShown())
+assert(addon:GetDepositProfile(1, false) == lastValidProfile)
+assert(depositSettings.SaveState == "error")
+
+depositSettings.ExpansionChecks[0].scripts.OnClick(
+    depositSettings.ExpansionChecks[0]
+)
+depositSettings.HeaderBackButton.scripts.OnClick()
+assert(not depositSettings:IsShown())
+assert(GuildBankOrganizerFrame:IsShown())
+
+addon:ShowDepositSettingsUI()
+depositSettings = GuildBankOrganizerDepositSettingsFrame
 depositSettings.LabelInput:SetText("Tailoring & Enchanting")
+depositSettings.CategoryChecks.herbs:SetChecked(false)
 depositSettings.CategoryChecks.cloth:SetChecked(true)
 depositSettings.CategoryChecks.enchanting:SetChecked(true)
 depositSettings.AllExpansionsCheck:SetChecked(false)
+depositSettings.ExpansionChecks[0]:SetChecked(false)
 depositSettings.ExpansionChecks[4]:SetChecked(true)
+depositSettings.ExactItemsInput:SetText("3371")
 depositSettings.SaveButton.scripts.OnClick()
 local savedProfile = addon:GetDepositProfile(1, false)
 assert(savedProfile and savedProfile.enabled)
@@ -1490,10 +1608,22 @@ slots[2] = {}
 addon:ShowDepositSettingsUI()
 fire("GUILDBANKBAGSLOTS_CHANGED")
 assert(GuildBankOrganizerDepositSettingsFrame.TabInput:GetText() == "2")
+GuildBankOrganizerDepositSettingsFrame.CategoryChecks.armor.scripts.OnClick(
+    GuildBankOrganizerDepositSettingsFrame.CategoryChecks.armor
+)
+GuildBankOrganizerDepositSettingsFrame.LabelInput:SetText("Automatic tab flush")
 currentGuildBankTab = 1
+fire("GUILDBANK_UPDATE_TABS")
+assert(addon:GetDepositProfile(2, false).label == "Automatic tab flush")
+assert(GuildBankOrganizerDepositSettingsFrame.TabInput:GetText() == "1")
+local profileBeforeBankClose = addon:GetDepositProfile(1, false)
+GuildBankOrganizerDepositSettingsFrame.AllExpansionsCheck:SetChecked(false)
+GuildBankOrganizerDepositSettingsFrame.ExpansionChecks[4]:SetChecked(false)
 numGuildBankTabs = 1
 fire("PLAYER_INTERACTION_MANAGER_FRAME_HIDE", Enum.PlayerInteractionType.GuildBanker)
 assert(not addon:IsBankOpen())
 assert(not GuildBankOrganizerFrame:IsShown())
+assert(not GuildBankOrganizerDepositSettingsFrame:IsShown())
+assert(addon:GetDepositProfile(1, false) == profileBeforeBankClose)
 
 print("smoke test passed")

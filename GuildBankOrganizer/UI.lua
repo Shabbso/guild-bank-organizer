@@ -8,6 +8,8 @@ local autoSelectGeneration = 0
 local autoSelectPending
 local refreshGeneration = 0
 local loadDepositSettings
+local flushDepositSettingsDraft
+local setDepositSaveState
 
 local COLORS = {
     panel = {0.035, 0.045, 0.050, 0.98},
@@ -139,6 +141,31 @@ local function createInput(parent, width, x, y)
     return input
 end
 
+local function applyCheckStyle(check)
+    local enabled = check:IsEnabled()
+    local hovered = enabled and check:IsMouseOver()
+    local borderColor = hovered and {0.34, 0.58, 0.60, 1} or COLORS.border
+    local fillColor = enabled and {0.018, 0.024, 0.027, 1}
+        or {0.025, 0.030, 0.032, 1}
+    local markColor = enabled and COLORS.accent or {0.24, 0.29, 0.30, 1}
+    if not enabled then
+        borderColor = {0.10, 0.12, 0.13, 1}
+    end
+
+    check.Box:SetColorTexture(unpack(fillColor))
+    check.Mark:SetColorTexture(unpack(markColor))
+    check.Top:SetColorTexture(unpack(borderColor))
+    check.Bottom:SetColorTexture(unpack(borderColor))
+    check.Left:SetColorTexture(unpack(borderColor))
+    check.Right:SetColorTexture(unpack(borderColor))
+    check.Label:SetTextColor(unpack(enabled and {1, 1, 1, 1} or COLORS.muted))
+    if check.gboChecked then
+        check.Mark:Show()
+    else
+        check.Mark:Hide()
+    end
+end
+
 local function createCheckBox(parent, text, x, y, callback)
     local check = CreateFrame("CheckButton", nil, parent)
     check:SetPoint("TOPLEFT", x, y)
@@ -146,11 +173,32 @@ local function createCheckBox(parent, text, x, y, callback)
     check.Box = check:CreateTexture(nil, "BACKGROUND")
     check.Box:SetAllPoints()
     check.Box:SetColorTexture(0.018, 0.024, 0.027, 1)
+    check.Top = check:CreateTexture(nil, "BORDER")
+    check.Top:SetPoint("TOPLEFT", 0, 0)
+    check.Top:SetPoint("TOPRIGHT", 0, 0)
+    check.Top:SetHeight(1)
+    check.Bottom = check:CreateTexture(nil, "BORDER")
+    check.Bottom:SetPoint("BOTTOMLEFT", 0, 0)
+    check.Bottom:SetPoint("BOTTOMRIGHT", 0, 0)
+    check.Bottom:SetHeight(1)
+    check.Left = check:CreateTexture(nil, "BORDER")
+    check.Left:SetPoint("TOPLEFT", 0, 0)
+    check.Left:SetPoint("BOTTOMLEFT", 0, 0)
+    check.Left:SetWidth(1)
+    check.Right = check:CreateTexture(nil, "BORDER")
+    check.Right:SetPoint("TOPRIGHT", 0, 0)
+    check.Right:SetPoint("BOTTOMRIGHT", 0, 0)
+    check.Right:SetWidth(1)
     check.Mark = check:CreateTexture(nil, "ARTWORK")
     check.Mark:SetPoint("TOPLEFT", 4, -4)
     check.Mark:SetPoint("BOTTOMRIGHT", -4, 4)
     check.Mark:SetColorTexture(unpack(COLORS.accent))
     check.Mark:Hide()
+
+    local label = parent:CreateFontString(nil, "OVERLAY", "GameFontHighlight")
+    label:SetPoint("LEFT", check, "RIGHT", 3, 0)
+    label:SetText(text)
+    check.Label = label
 
     local nativeSetChecked = check.SetChecked
     check.gboChecked = false
@@ -158,11 +206,7 @@ local function createCheckBox(parent, text, x, y, callback)
         checked = checked and true or false
         self.gboChecked = checked
         nativeSetChecked(self, checked)
-        if checked then
-            self.Mark:Show()
-        else
-            self.Mark:Hide()
-        end
+        applyCheckStyle(self)
     end
     check.GetChecked = function(self)
         return self.gboChecked
@@ -173,11 +217,21 @@ local function createCheckBox(parent, text, x, y, callback)
             callback(self)
         end
     end)
-
-    local label = parent:CreateFontString(nil, "OVERLAY", "GameFontHighlight")
-    label:SetPoint("LEFT", check, "RIGHT", 3, 0)
-    label:SetText(text)
-    check.Label = label
+    check:SetScript("OnEnter", function(self)
+        applyCheckStyle(self)
+        if self.GBOOnEnter then
+            self:GBOOnEnter()
+        end
+    end)
+    check:SetScript("OnLeave", function(self)
+        applyCheckStyle(self)
+        if self.GBOOnLeave then
+            self:GBOOnLeave()
+        end
+    end)
+    check:SetScript("OnEnable", applyCheckStyle)
+    check:SetScript("OnDisable", applyCheckStyle)
+    applyCheckStyle(check)
     return check
 end
 
@@ -749,8 +803,13 @@ function GBO:RefreshOrganizerUI()
         if tab
             and depositSettingsFrame.LastBankTab ~= tab
             and loadDepositSettings
+            and flushDepositSettingsDraft
+            and not depositSettingsFrame.Flushing
+            and not depositSettingsFrame.Navigating
         then
-            loadDepositSettings(tab)
+            if flushDepositSettingsDraft("bank-tab") then
+                loadDepositSettings(tab)
+            end
         end
         setButtonEnabled(depositSettingsFrame.SaveButton, tab and not busy)
         setButtonEnabled(depositSettingsFrame.ScanButton, tab and not busy)
@@ -1058,7 +1117,7 @@ loadDepositSettings = function(tab)
         (depositSettingsFrame.ScanGeneration or 0) + 1
     tab = tonumber(tab) or currentTab()
     if not tab or tab < 1 or tab > GetNumGuildBankTabs() then
-        depositSettingsFrame.StatusText:SetText(
+        setDepositSaveState("error",
             "Enter a purchased guild-bank tab number."
         )
         return
@@ -1108,25 +1167,37 @@ loadDepositSettings = function(tab)
         table.insert(exactText, tostring(itemID))
     end
     depositSettingsFrame.ExactItemsInput:SetText(table.concat(exactText, ", "))
-    depositSettingsFrame.LoadingProfile = false
-    depositSettingsFrame.StatusText:SetText(
-        "Step 2: choose categories, then save. Hover a category to see its rule."
+    setDepositSaveState(
+        "saved",
+        "All changes saved. Hover a category to see its rule."
     )
-    depositSettingsFrame.StatusText:SetTextColor(1, 1, 1)
+    depositSettingsFrame.LoadingProfile = false
 end
 
-local function saveDepositSettings()
+setDepositSaveState = function(state, message)
     local frame = depositSettingsFrame
     if not frame then
         return
     end
-    local tab = tonumber(frame.TabInput:GetText())
+    frame.SaveState = state
+    frame.StatusText:SetText(tostring(message or ""))
+    if state == "saved" then
+        frame.StatusText:SetTextColor(unpack(COLORS.accent))
+    elseif state == "error" then
+        frame.StatusText:SetTextColor(1, 0.35, 0.30)
+    elseif state == "saving" then
+        frame.StatusText:SetTextColor(unpack(COLORS.gold))
+    else
+        frame.StatusText:SetTextColor(1, 1, 1)
+    end
+end
+
+local function readDepositSettingsDraft()
+    local frame = depositSettingsFrame
     local categories = {}
-    local count = 0
     for key, check in pairs(frame.CategoryChecks) do
         if check:GetChecked() then
             categories[key] = true
-            count = count + 1
         end
     end
     local expansions = {}
@@ -1140,34 +1211,44 @@ local function saveDepositSettings()
         exactItemIDs[tonumber(itemID)] = true
     end
 
-    local ok, reason = GBO:SaveDepositProfile(
-        tab,
-        frame.EnabledCheck:GetChecked(),
-        frame.LabelInput:GetText(),
-        categories,
-        frame.AllExpansionsCheck:GetChecked(),
-        expansions,
-        exactItemIDs
-    )
-    if not ok then
-        frame.StatusText:SetText(tostring(reason))
-        return
+    return frame.SelectedTab, {
+        enabled = frame.EnabledCheck:GetChecked(),
+        label = frame.LabelInput:GetText(),
+        categories = categories,
+        allExpansions = frame.AllExpansionsCheck:GetChecked(),
+        expansions = expansions,
+        exactItemIDs = exactItemIDs,
+    }
+end
+
+flushDepositSettingsDraft = function(action)
+    local frame = depositSettingsFrame
+    if not frame then
+        return false
+    end
+    if frame.LoadingProfile or frame.Flushing then
+        return true
     end
 
-    frame.SelectedTab = tab
-    local savedProfile = GBO:GetDepositProfile(tab, false)
-    frame.EnabledCheck:SetChecked(savedProfile and savedProfile.enabled)
-    frame.StatusText:SetText(savedProfile and savedProfile.enabled
-        and string.format(
-            "Saved and active! %d categor%s route to Tab %d. Next: Back to Organizer.",
-            count,
-            count == 1 and "y" or "ies",
-            tab
-        )
-        or "Saved, but this profile is paused. Enable it and save to include it in scans."
-    )
-    frame.StatusText:SetTextColor(unpack(COLORS.accent))
+    local tab, draft = readDepositSettingsDraft()
+    if not tab then
+        setDepositSaveState("error", "Choose a destination tab before saving.")
+        return false
+    end
+
+    frame.Flushing = true
+    setDepositSaveState("saving", "Saving...")
+    local ok, reason = GBO:SaveDepositProfileDraft(tab, draft)
+    if not ok then
+        frame.Flushing = false
+        setDepositSaveState("error", tostring(reason))
+        return false
+    end
+
+    setDepositSaveState("saved", "Saved.")
     GBO:RefreshOrganizerUI()
+    frame.Flushing = false
+    return true
 end
 
 local function createDepositSettingsFrame()
@@ -1179,11 +1260,33 @@ local function createDepositSettingsFrame()
     )
     anchorBesideGuildBank(frame)
     frame.Close:Hide()
-    frame.HeaderBackButton = createButton(frame, "< Back to Organizer", 134, 22, function()
+
+    local function returnToOrganizer(action)
+        if not flushDepositSettingsDraft(action) then
+            return
+        end
+        frame.Navigating = true
         frame:Hide()
         if GBO:IsBankOpen() then
             GBO:ShowOrganizerUI()
         end
+        frame.Navigating = false
+    end
+
+    local function commitInput(input, action, clearFocus)
+        if input.GBOCommitInProgress then
+            return
+        end
+        input.GBOCommitInProgress = true
+        flushDepositSettingsDraft(action)
+        if clearFocus then
+            input:ClearFocus()
+        end
+        input.GBOCommitInProgress = false
+    end
+
+    frame.HeaderBackButton = createButton(frame, "< Back to Organizer", 134, 22, function()
+        returnToOrganizer("back")
     end)
     frame.HeaderBackButton:SetPoint("TOPRIGHT", -4, -4)
 
@@ -1198,11 +1301,15 @@ local function createDepositSettingsFrame()
     createLabel(frame, "1  Destination tab", 20, -72)
     frame.TabInput = createInput(frame, 54, 58, -66)
     frame.UseCurrentButton = createButton(frame, "Use Current", 100, 24, function()
-        loadDepositSettings(currentTab())
+        if flushDepositSettingsDraft("use-current") then
+            loadDepositSettings(currentTab())
+        end
     end)
     frame.UseCurrentButton:SetPoint("TOPLEFT", 124, -66)
     frame.LoadButton = createButton(frame, "Load Tab", 90, 24, function()
-        loadDepositSettings(frame.TabInput:GetText())
+        if flushDepositSettingsDraft("load-tab") then
+            loadDepositSettings(frame.TabInput:GetText())
+        end
     end)
     frame.LoadButton:SetPoint("TOPLEFT", 234, -66)
 
@@ -1214,12 +1321,20 @@ local function createDepositSettingsFrame()
     createLabel(frame, "Name", 20, -112)
     frame.LabelInput = createInput(frame, 210, 112, -106)
     frame.LabelInput:SetJustifyH("LEFT")
+    frame.LabelInput:SetScript("OnEnterPressed", function(self)
+        commitInput(self, "label-enter", true)
+    end)
+    frame.LabelInput:SetScript("OnEditFocusLost", function(self)
+        commitInput(self, "label-focus")
+    end)
     frame.EnabledCheck = createCheckBox(
         frame,
         "Enable this tab profile",
         330,
         -106,
-        function() end
+        function()
+            flushDepositSettingsDraft("checkbox")
+        end
     )
 
     createLabel(frame, "2  Items that belong in this tab", 20, -150)
@@ -1249,11 +1364,12 @@ local function createDepositSettingsFrame()
                 if self:GetChecked() then
                     frame.EnabledCheck:SetChecked(true)
                 end
+                flushDepositSettingsDraft("checkbox")
             end
         )
         check.Label:SetWidth(190)
         check.Label:SetJustifyH("LEFT")
-        check:SetScript("OnEnter", function(self)
+        check.GBOOnEnter = function(self)
             if GameTooltip then
                 GameTooltip:SetOwner(self, "ANCHOR_RIGHT")
                 GameTooltip:SetText(category.name)
@@ -1261,12 +1377,12 @@ local function createDepositSettingsFrame()
                 GameTooltip:AddLine("Rule: " .. category.evidence, 0.35, 0.85, 0.90, true)
                 GameTooltip:Show()
             end
-        end)
-        check:SetScript("OnLeave", function()
+        end
+        check.GBOOnLeave = function()
             if GameTooltip then
                 GameTooltip:Hide()
             end
-        end)
+        end
         frame.CategoryChecks[category.key] = check
     end
 
@@ -1283,6 +1399,7 @@ local function createDepositSettingsFrame()
                     expansionCheck:SetChecked(false)
                 end
             end
+            flushDepositSettingsDraft("checkbox")
         end
     )
     frame.ExpansionChecks = {}
@@ -1297,6 +1414,7 @@ local function createDepositSettingsFrame()
                 if self:GetChecked() then
                     frame.AllExpansionsCheck:SetChecked(false)
                 end
+                flushDepositSettingsDraft("checkbox")
             end
         )
         check.Label:SetWidth(58)
@@ -1321,6 +1439,12 @@ local function createDepositSettingsFrame()
             frame.EnabledCheck:SetChecked(true)
         end
     end)
+    frame.ExactItemsInput:SetScript("OnEnterPressed", function(self)
+        commitInput(self, "exact-items-enter", true)
+    end)
+    frame.ExactItemsInput:SetScript("OnEditFocusLost", function(self)
+        commitInput(self, "exact-items-focus")
+    end)
     local exactHelp = frame:CreateFontString(nil, "OVERLAY", "GameFontDisableSmall")
     exactHelp:SetPoint("TOPLEFT", 20, exactItemsY - 26)
     exactHelp:SetPoint("TOPRIGHT", -20, exactItemsY - 26)
@@ -1329,12 +1453,17 @@ local function createDepositSettingsFrame()
         "Comma-separated IDs override categories. Useful for unusual lockboxes or crafted items."
     )
 
-    frame.SaveButton = createButton(frame, "Save Tab Profile", 145, 28, saveDepositSettings)
+    frame.SaveButton = createButton(frame, "Save Now", 145, 28, function()
+        flushDepositSettingsDraft("button")
+    end)
     frame.SaveButton:SetPoint("BOTTOMLEFT", 20, 58)
     frame.ScanButton = createButton(frame, "Scan Bags Now", 125, 28, function()
+        if not flushDepositSettingsDraft("scan") then
+            return
+        end
         frame.ScanGeneration = (frame.ScanGeneration or 0) + 1
         local generation = frame.ScanGeneration
-        local tab = tonumber(frame.TabInput:GetText())
+        local tab = frame.SelectedTab
 
         local function runScan(lockAttempt)
             if not frame:IsShown() or frame.ScanGeneration ~= generation then
@@ -1457,10 +1586,7 @@ local function createDepositSettingsFrame()
     end)
     frame.ScanButton:SetPoint("LEFT", frame.SaveButton, "RIGHT", 10, 0)
     frame.CloseButton = createButton(frame, "< Back to Organizer", 140, 28, function()
-        frame:Hide()
-        if GBO:IsBankOpen() then
-            GBO:ShowOrganizerUI()
-        end
+        returnToOrganizer("back")
     end)
     frame.CloseButton:SetPoint("LEFT", frame.ScanButton, "RIGHT", 10, 0)
 
@@ -1478,6 +1604,9 @@ local function createDepositSettingsFrame()
         scheduleRefresh()
     end)
     frame:SetScript("OnHide", function()
+        if not frame.Navigating and frame.SelectedTab then
+            flushDepositSettingsDraft("hide")
+        end
         if not organizerFrame or not organizerFrame:IsShown() then
             if not advancedFrame or not advancedFrame:IsShown() then
                 refreshGeneration = refreshGeneration + 1
