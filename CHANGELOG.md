@@ -1,5 +1,20 @@
 # Changelog
 
+## 1.2.0-beta.2 - 2026-08-12
+
+- Replaced the ambiguous Smart Deposit action with separate **Deposit This
+  Tab** and **Deposit All Tabs** buttons.
+- Made the currently open tab the permanent primary action; the addon never
+  remembers or silently defaults to an all-tabs deposit.
+- Added current-tab and all-configured-tabs item and deposit counts directly
+  to the compact organizer.
+- Added clear feedback when the open tab has no matching items but another
+  configured tab does.
+- Corrected current-tab progress, opening messages, timelines, and reports so
+  they exclude items and moves assigned to unselected tabs.
+- Replaced both scope actions with one clear **Stop** control while an organizer
+  operation is active.
+
 ## 1.2.0-beta.1 - 2026-08-12
 
 - Replaced the small Smart Deposit exception list with a generated profession

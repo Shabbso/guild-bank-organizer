@@ -81,14 +81,23 @@ multiple categories. The same category may be routed to different tabs when
 their expansion filters do not overlap. Optional exact item IDs handle unusual
 lockboxes or crafted items whose profession is not present in item metadata.
 When matching items are found, the compact panel shows the item and deposit
-counts and enables **Smart Deposit**.
+counts for two explicit choices:
+
+- **Deposit This Tab** moves only items assigned to the guild-bank tab you are
+  currently viewing. This is always the primary action.
+- **Deposit All Tabs** routes eligible bag items to every enabled tab profile.
+  It is always a separate choice and is never remembered as a default.
+
+If the open tab has no matching items but another configured tab does, the
+current-tab action remains disabled while the all-tabs action shows the full
+available count. The addon never redirects one action into the other.
 
 Deposits use a separate confirmation-driven queue and are not held to the
 1.25-second intra-bank sorting cadence. The queue waits 150 ms after each
 confirmed deposit before issuing another command. If the server silently
 rejects one command, the addon refreshes both endpoints and retries once only
 when the bag source and bank destination are provably unchanged. Nothing moves
-until the player clicks **Smart Deposit**.
+until the player clicks one of the two explicit deposit actions.
 
 Category rules are based on the client item class, subclass, equipment slot,
 profession recipe graph, specialized-bag metadata, source-backed item era, or
