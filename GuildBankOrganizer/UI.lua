@@ -407,10 +407,21 @@ local function formatAllDepositCount(scope)
     )
 end
 
+local ROUTE_EXACT_PRIORITY = 3
+
 local function formatRoutingConflict(conflict)
     local tabLabels = {}
     for _, tab in ipairs(conflict.tabs or {}) do
         table.insert(tabLabels, "Tab " .. tostring(tab))
+    end
+    if conflict.priority == ROUTE_EXACT_PRIORITY
+        or conflict.categoryKey == nil
+    then
+        return string.format(
+            "%s has exact item-ID routes to %s. Choose one destination.",
+            tostring(conflict.name or ("Item " .. tostring(conflict.itemID))),
+            table.concat(tabLabels, " and ")
+        )
     end
     return string.format(
         "%s has equally specific %s / %s routes to %s. Choose one destination.",
@@ -596,6 +607,33 @@ local function updateSortDirection(check)
     GBO:RefreshOrganizerUI()
 end
 
+local function setDepositMutationControlsEnabled(enabled)
+    local frame = depositSettingsFrame
+    if not frame then
+        return
+    end
+
+    for _, control in ipairs({
+        frame.TabInput,
+        frame.UseCurrentButton,
+        frame.LoadButton,
+        frame.LabelInput,
+        frame.EnabledCheck,
+        frame.AllExpansionsCheck,
+        frame.ExactItemsInput,
+        frame.SaveButton,
+        frame.ScanButton,
+    }) do
+        setButtonEnabled(control, enabled)
+    end
+    for _, check in pairs(frame.CategoryChecks or {}) do
+        setButtonEnabled(check, enabled)
+    end
+    for _, check in pairs(frame.ExpansionChecks or {}) do
+        setButtonEnabled(check, enabled)
+    end
+end
+
 function GBO:RefreshOrganizerUI()
     local tab = currentTab()
     local busy = isBusy()
@@ -625,6 +663,7 @@ function GBO:RefreshOrganizerUI()
         end
 
         setButtonEnabled(organizerFrame.SortButton, tab and not busy)
+        setButtonEnabled(organizerFrame.SetupButton, tab and not busy)
         if busy then
             organizerFrame.DepositCurrentButton:Hide()
             organizerFrame.DepositAllButton:Hide()
@@ -840,8 +879,7 @@ function GBO:RefreshOrganizerUI()
                 loadDepositSettings(tab)
             end
         end
-        setButtonEnabled(depositSettingsFrame.SaveButton, tab and not busy)
-        setButtonEnabled(depositSettingsFrame.ScanButton, tab and not busy)
+        setDepositMutationControlsEnabled(tab and not busy)
     end
 end
 
@@ -1462,6 +1500,43 @@ setDepositSaveState = function(state, message)
     end
 end
 
+local function parseExactItemIDs(text)
+    text = tostring(text or "")
+    if string.match(text, "^%s*$") then
+        return {}
+    end
+
+    local trimmed = string.match(text, "^%s*(.-)%s*$")
+    if string.match(trimmed, "^,")
+        or string.match(trimmed, ",$")
+        or string.find(trimmed, ",%s*,")
+    then
+        return nil, string.format(
+            "Invalid exact item ID list \"%s\". Use positive whole-number IDs separated by commas or spaces.",
+            trimmed
+        )
+    end
+
+    local exactItemIDs = {}
+    local foundToken = false
+    for token in string.gmatch(text, "[^,%s]+") do
+        foundToken = true
+        local itemID = string.match(token, "^%d+$") and tonumber(token) or nil
+        if not itemID or itemID <= 0 then
+            return nil, string.format(
+                "Invalid exact item ID \"%s\". Use positive whole-number IDs separated by commas or spaces.",
+                token
+            )
+        end
+        exactItemIDs[itemID] = true
+    end
+    if not foundToken then
+        return nil,
+            "Invalid exact item ID list. Use positive whole-number IDs separated by commas or spaces."
+    end
+    return exactItemIDs
+end
+
 local function readDepositSettingsDraft()
     local frame = depositSettingsFrame
     local categories = {}
@@ -1476,9 +1551,11 @@ local function readDepositSettingsDraft()
             expansions[expansionID] = true
         end
     end
-    local exactItemIDs = {}
-    for itemID in string.gmatch(frame.ExactItemsInput:GetText() or "", "%d+") do
-        exactItemIDs[tonumber(itemID)] = true
+    local exactItemIDs, exactItemReason = parseExactItemIDs(
+        frame.ExactItemsInput:GetText()
+    )
+    if not exactItemIDs then
+        return frame.SelectedTab, nil, exactItemReason
     end
 
     return frame.SelectedTab, {
@@ -1499,10 +1576,21 @@ flushDepositSettingsDraft = function(action)
     if frame.LoadingProfile or frame.Flushing then
         return true
     end
+    if isBusy() then
+        setDepositSaveState(
+            "error",
+            "Finish or stop the active Smart Deposit before changing profiles."
+        )
+        return false
+    end
 
-    local tab, draft = readDepositSettingsDraft()
+    local tab, draft, draftReason = readDepositSettingsDraft()
     if not tab then
         setDepositSaveState("error", "Choose a destination tab before saving.")
+        return false
+    end
+    if not draft then
+        setDepositSaveState("error", tostring(draftReason))
         return false
     end
 
@@ -1720,7 +1808,7 @@ local function createDepositSettingsFrame()
     exactHelp:SetPoint("TOPRIGHT", -20, exactItemsY - 26)
     exactHelp:SetJustifyH("LEFT")
     exactHelp:SetText(
-        "Comma-separated IDs override categories. Useful for unusual lockboxes or crafted items."
+        "Comma- or space-separated positive whole-number IDs override categories."
     )
 
     frame.SaveButton = createButton(frame, "Save Now", 145, 28, function()
@@ -1924,6 +2012,12 @@ end
 function GBO:ShowDepositSettingsUI(tab)
     if not self:IsBankOpen() then
         self:Print("Open the guild bank before configuring Smart Deposits.")
+        return
+    end
+    if isBusy() then
+        self:Print(
+            "Finish or stop the current guild-bank operation before editing Smart Deposit profiles."
+        )
         return
     end
     depositSettingsFrame =

@@ -141,9 +141,6 @@ function GBO:InitializeDatabase()
     if type(GuildBankOrganizerDB.settings) ~= "table" then
         GuildBankOrganizerDB.settings = {}
     end
-    if type(GuildBankOrganizerDB.depositProfiles) ~= "table" then
-        GuildBankOrganizerDB.depositProfiles = {}
-    end
     self:MigrateDepositProfileDatabase(GuildBankOrganizerDB, previousSchema)
     GuildBankOrganizerDB.schema = 6
 

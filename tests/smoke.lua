@@ -121,6 +121,16 @@ local function runNextTimer()
     timer.callback()
 end
 
+local function finishDepositPlanScan()
+    local attempts = 0
+    while addon:IsDepositScanning() do
+        runNextTimer()
+        attempts = attempts + 1
+        assert(attempts < 100, "deposit plan scan did not converge")
+    end
+    addon:RefreshOrganizerUI()
+end
+
 MAX_GUILDBANK_SLOTS_PER_TAB = 98
 NUM_BAG_SLOTS = 4
 UIParent = {}
@@ -673,6 +683,20 @@ assert(formattedExcluded.name == "Test Sapper Charge")
 assert(formattedExcluded.status == "excluded")
 assert(string.find(formattedExcluded.statusText, "internal test item", 1, true))
 assert(#addon:SearchProfessionReference("Test Sapper Charge", 50) == 0)
+local crashItemReference = assert(addon:GetProfessionReferenceItem(47842))
+assert(crashItemReference.status == "excluded")
+assert(crashItemReference.evidence == "programmer-only crash item")
+assert(addon:SearchProfessionReference("47842", 50)[1] == crashItemReference)
+assert(#addon:SearchProfessionReference("SERVER CRASHING ITEM", 50) == 0)
+for _, itemID in ipairs({ 23364, 27774, 56478 }) do
+    local record = assert(addon:GetProfessionReferenceItem(itemID))
+    assert(record.status == "excluded")
+    assert(addon:SearchProfessionReference(tostring(itemID), 50)[1] == record)
+    assert(#addon:SearchProfessionReference(record.name, 50) == 0)
+end
+for _, itemID in ipairs({ 3172, 4366, 23767, 34626 }) do
+    assert(addon:GetProfessionReferenceItem(itemID).status == "public")
+end
 local unsupportedReference = addon:FormatCategoryReferenceResult({
     itemID = 999999,
     name = "Unknown",
@@ -888,6 +912,29 @@ GuildBankOrganizerDB = {
     schema = 5,
     settings = {},
     runs = {},
+    depositProfiles = "first malformed top-level profile container",
+}
+addon:InitializeDatabase()
+assert(type(GuildBankOrganizerDB.depositProfiles) == "table")
+local topLevelRecovery = assert(addon:GetDepositProfileRecovery())
+assert(
+    topLevelRecovery.__depositProfilesContainer
+        == "first malformed top-level profile container"
+)
+local firstTopLevelRecovery = topLevelRecovery.__depositProfilesContainer
+GuildBankOrganizerDB.depositProfiles = false
+addon:InitializeDatabase()
+assert(type(GuildBankOrganizerDB.depositProfiles) == "table")
+assert(
+    addon:GetDepositProfileRecovery().__depositProfilesContainer
+        == firstTopLevelRecovery
+)
+
+GuildBankOrganizerDB = {
+    schema = 5,
+    settings = {},
+    runs = {},
+    depositProfileRecovery = topLevelRecovery,
     depositProfiles = {
         ["Test Realm\031Test Guild"] = {
             [1] = {
@@ -1155,6 +1202,7 @@ assert(addon:SaveDepositProfileDraft(1, {
     expansions = { [0] = true },
     exactItemIDs = { [3371] = true },
 }))
+finishDepositPlanScan()
 GuildBankOrganizerAdvancedFrame.CategoryReferenceButton.scripts.OnClick()
 assert(string.find(
     GuildBankOrganizerCategoryReferenceFrame.ResultList.Text:GetText(),
@@ -1171,6 +1219,7 @@ assert(addon:SaveDepositProfileDraft(1, {
     expansions = { [0] = true },
     exactItemIDs = {},
 }))
+finishDepositPlanScan()
 GuildBankOrganizerAdvancedFrame.CategoryReferenceButton.scripts.OnClick()
 assert(not string.find(
     GuildBankOrganizerCategoryReferenceFrame.ResultList.Text:GetText(),
@@ -1187,6 +1236,7 @@ assert(addon:SaveDepositProfileDraft(1, {
     expansions = { [0] = true },
     exactItemIDs = { [3371] = true },
 }))
+finishDepositPlanScan()
 GuildBankOrganizerAdvancedFrame.CategoryReferenceButton.scripts.OnClick()
 
 GuildBankOrganizerCategoryReferenceFrame.SearchInput:SetText("23418")
@@ -1235,6 +1285,7 @@ assert(addon:SaveDepositProfileDraft(1, {
     expansions = { [0] = true },
     exactItemIDs = { [3371] = true, [4402] = true },
 }))
+finishDepositPlanScan()
 GuildBankOrganizerAdvancedFrame.CategoryReferenceButton.scripts.OnClick()
 assert(string.find(
     GuildBankOrganizerCategoryReferenceFrame.ResultList.Text:GetText(),
@@ -1257,6 +1308,7 @@ assert(addon:SaveDepositProfileDraft(1, {
     expansions = { [0] = true },
     exactItemIDs = { [3371] = true },
 }))
+finishDepositPlanScan()
 while addon:IsDepositScanning() do
     runNextTimer()
 end
@@ -1285,6 +1337,13 @@ runTimers()
 assert(not addon:IsDiagnosticRunning())
 assert(addon.lastReport and string.find(addon.lastReport, "result=PASS", 1, true))
 assert(string.find(addon.lastReport, "profileRecovery:", 1, true))
+assert(string.find(addon.lastReport, "__depositProfilesContainer", 1, true))
+assert(string.find(
+    addon.lastReport,
+    "first malformed top-level profile container",
+    1,
+    true
+))
 assert(string.find(addon.lastReport, "Test Realm", 1, true))
 assert(string.find(addon.lastReport, 'tab="line\\nbreak"', 1, true))
 assert(not string.find(addon.lastReport, "tab=line\nbreak", 1, true))
@@ -1423,6 +1482,7 @@ uncheckedCloth.scripts.OnLeave(uncheckedCloth)
 depositSettings.CategoryChecks.herbs.scripts.OnClick(
     depositSettings.CategoryChecks.herbs
 )
+finishDepositPlanScan()
 local autosavedProfile = addon:GetDepositProfile(1, false)
 assert(autosavedProfile and autosavedProfile.enabled)
 assert(autosavedProfile.categories.herbs)
@@ -1435,6 +1495,7 @@ assert(depositSettings.CategoryChecks.herbs.Mark.color[3] == 0.82)
 depositSettings.ExpansionChecks[0].scripts.OnClick(
     depositSettings.ExpansionChecks[0]
 )
+finishDepositPlanScan()
 autosavedProfile = addon:GetDepositProfile(1, false)
 assert(not autosavedProfile.allExpansions)
 assert(autosavedProfile.expansions[0])
@@ -1442,16 +1503,66 @@ assert(depositSettings.SaveState == "saved")
 
 depositSettings.LabelInput:SetText("Classic Herbs")
 depositSettings.LabelInput.scripts.OnEnterPressed(depositSettings.LabelInput)
+finishDepositPlanScan()
 assert(addon:GetDepositProfile(1, false).label == "Classic Herbs")
 
 depositSettings.ExactItemsInput:SetText("785")
 depositSettings.ExactItemsInput.scripts.OnEditFocusLost(
     depositSettings.ExactItemsInput
 )
+finishDepositPlanScan()
 autosavedProfile = addon:GetDepositProfile(1, false)
 assert(autosavedProfile.exactItemIDs[785])
 
+local profileBeforeInvalidExactIDs = addon:GetDepositProfile(1, false)
+for _, invalidText in ipairs({ "-3371", "785.5", "3371x", "0" }) do
+    depositSettings.ExactItemsInput:SetText(invalidText)
+    depositSettings.ExactItemsInput.scripts.OnEditFocusLost(
+        depositSettings.ExactItemsInput
+    )
+    assert(depositSettings.SaveState == "error")
+    assert(string.find(
+        depositSettings.StatusText:GetText(),
+        invalidText,
+        1,
+        true
+    ))
+    assert(string.find(
+        depositSettings.StatusText:GetText(),
+        "positive whole-number",
+        1,
+        true
+    ))
+    assert(addon:GetDepositProfile(1, false) == profileBeforeInvalidExactIDs)
+    assert(profileBeforeInvalidExactIDs.exactItemIDs[785])
+end
+
+depositSettings.ExactItemsInput:SetText("785, 3371\n2604")
+depositSettings.ExactItemsInput.scripts.OnEditFocusLost(
+    depositSettings.ExactItemsInput
+)
+finishDepositPlanScan()
+autosavedProfile = addon:GetDepositProfile(1, false)
+assert(autosavedProfile.exactItemIDs[785])
+assert(autosavedProfile.exactItemIDs[3371])
+assert(autosavedProfile.exactItemIDs[2604])
+
+depositSettings.ExactItemsInput:SetText("   ")
+depositSettings.ExactItemsInput.scripts.OnEditFocusLost(
+    depositSettings.ExactItemsInput
+)
+finishDepositPlanScan()
+assert(not next(addon:GetDepositProfile(1, false).exactItemIDs))
+
+depositSettings.ExactItemsInput:SetText("785")
+depositSettings.ExactItemsInput.scripts.OnEditFocusLost(
+    depositSettings.ExactItemsInput
+)
+finishDepositPlanScan()
+assert(addon:GetDepositProfile(1, false).exactItemIDs[785])
+
 addon:HideOrganizerUI()
+finishDepositPlanScan()
 local profileBeforeProgrammaticLoad = addon:GetDepositProfile(1, false)
 addon:ShowDepositSettingsUI()
 depositSettings = GuildBankOrganizerDepositSettingsFrame
@@ -1475,9 +1586,11 @@ assert(depositSettings.SaveState == "error")
 depositSettings.ExpansionChecks[0].scripts.OnClick(
     depositSettings.ExpansionChecks[0]
 )
+finishDepositPlanScan()
 depositSettings.HeaderBackButton.scripts.OnClick()
 assert(not depositSettings:IsShown())
 assert(GuildBankOrganizerFrame:IsShown())
+finishDepositPlanScan()
 
 addon:ShowDepositSettingsUI()
 depositSettings = GuildBankOrganizerDepositSettingsFrame
@@ -1490,6 +1603,7 @@ depositSettings.ExpansionChecks[0]:SetChecked(false)
 depositSettings.ExpansionChecks[4]:SetChecked(true)
 depositSettings.ExactItemsInput:SetText("3371")
 depositSettings.SaveButton.scripts.OnClick()
+finishDepositPlanScan()
 local savedProfile = addon:GetDepositProfile(1, false)
 assert(savedProfile and savedProfile.enabled)
 assert(savedProfile.categories.cloth)
@@ -1508,6 +1622,7 @@ local allClothSaved = addon:SaveDepositProfile(
     {}
 )
 assert(allClothSaved)
+finishDepositPlanScan()
 local allClothProfile = addon:GetDepositProfile(2, false)
 local bothAllSaved, bothAllMessage = addon:SaveDepositProfile(
     1,
@@ -1676,6 +1791,25 @@ profiles[3] = {
     exactItemIDs = {},
     enabledStateVersion = 1,
 }
+profiles[2].exactItemIDs[785] = true
+profiles[3].exactItemIDs[785] = true
+assert(addon:RefreshDepositPlan())
+runTimers()
+local exactConflict = assert(addon:GetFirstDepositRoutingConflict())
+assert(exactConflict.itemID == 785)
+assert(exactConflict.priority == 3)
+addon:ShowOrganizerUI()
+addon:RefreshOrganizerUI()
+local exactConflictMessage = GuildBankOrganizerFrame.SmartHint:GetText()
+assert(string.find(exactConflictMessage, "exact item-ID routes", 1, true))
+assert(string.find(exactConflictMessage, "Tab 2", 1, true))
+assert(string.find(exactConflictMessage, "Tab 3", 1, true))
+assert(not string.find(exactConflictMessage, "nil", 1, true))
+assert(not string.find(exactConflictMessage, "Unknown expansion", 1, true))
+addon:HideOrganizerUI()
+runTimers()
+profiles[2].exactItemIDs[785] = nil
+profiles[3].exactItemIDs[785] = nil
 assert(addon:RefreshDepositPlan())
 runTimers()
 
@@ -1819,12 +1953,100 @@ assert(organizer.DepositCurrentButton:IsEnabled())
 assert(organizer.DepositAllButton:IsEnabled())
 assert(GuildBankOrganizerDB.settings.depositScope == nil)
 
+addon:ShowDepositSettingsUI()
+local busySettings = GuildBankOrganizerDepositSettingsFrame
+local profileBeforeDeposit = addon:GetDepositProfile(1, false)
 assert(addon:StartDeposit(1))
+assert(addon:IsDepositScanning())
+local scanSaved, scanReason = addon:SaveDepositProfileDraft(1, {
+    enabled = true,
+    label = "Changed during deposit scan",
+    categories = { cloth = true },
+    allExpansions = false,
+    expansions = { [4] = true },
+    exactItemIDs = { [785] = true },
+})
+assert(not scanSaved)
+assert(string.find(scanReason, "active Smart Deposit", 1, true))
+assert(addon:GetDepositProfile(1, false) == profileBeforeDeposit)
+local depositStartAttempts = 0
+while not addon:IsDepositRunning() do
+    runNextTimer()
+    depositStartAttempts = depositStartAttempts + 1
+    assert(depositStartAttempts < 100, "deposit did not enter its running state")
+end
 addon:RefreshOrganizerUI()
+
+local mutationControls = {
+    busySettings.TabInput,
+    busySettings.UseCurrentButton,
+    busySettings.LoadButton,
+    busySettings.LabelInput,
+    busySettings.EnabledCheck,
+    busySettings.AllExpansionsCheck,
+    busySettings.ExactItemsInput,
+    busySettings.SaveButton,
+    busySettings.ScanButton,
+}
+for _, check in pairs(busySettings.CategoryChecks) do
+    table.insert(mutationControls, check)
+end
+for _, check in pairs(busySettings.ExpansionChecks) do
+    table.insert(mutationControls, check)
+end
+for _, control in ipairs(mutationControls) do
+    assert(not control:IsEnabled())
+end
+
+local busySaved, busyReason = addon:SaveDepositProfileDraft(1, {
+    enabled = true,
+    label = "Changed during deposit",
+    categories = { cloth = true },
+    allExpansions = false,
+    expansions = { [4] = true },
+    exactItemIDs = { [785] = true },
+})
+assert(not busySaved)
+assert(string.find(busyReason, "active Smart Deposit", 1, true))
+assert(addon:GetDepositProfile(1, false) == profileBeforeDeposit)
+assert(profileBeforeDeposit.label == "Tailoring")
+assert(not profileBeforeDeposit.exactItemIDs[785])
+
+busySettings.LabelInput:SetText("Autosave must not win")
+busySettings.SaveButton.scripts.OnClick()
+assert(busySettings.SaveState == "error")
+assert(string.find(
+    busySettings.StatusText:GetText(),
+    "active Smart Deposit",
+    1,
+    true
+))
+assert(addon:GetDepositProfile(1, false) == profileBeforeDeposit)
+
+addon:HideOrganizerUI()
+addon:ShowDepositSettingsUI()
+assert(not busySettings:IsShown())
+addon:ShowOrganizerUI()
+addon:RefreshOrganizerUI()
+assert(not organizer.SetupButton:IsEnabled())
 assert(not organizer.DepositCurrentButton:IsShown())
 assert(not organizer.DepositAllButton:IsShown())
 assert(organizer.DepositStopButton:IsShown())
+addon:HideOrganizerUI()
 runTimers()
+
+addon:ShowOrganizerUI()
+addon:RefreshOrganizerUI()
+assert(organizer.SetupButton:IsEnabled())
+addon:ShowDepositSettingsUI()
+assert(busySettings:IsShown())
+for _, control in ipairs(mutationControls) do
+    assert(control:IsEnabled())
+end
+assert(busySettings.LabelInput:GetText() == "Tailoring")
+addon:HideOrganizerUI()
+runTimers()
+
 addon:RefreshOrganizerUI()
 assert(organizer.DepositCurrentButton:IsShown())
 assert(organizer.DepositAllButton:IsShown())
@@ -1898,6 +2120,7 @@ assert(GuildBankOrganizerDepositSettingsFrame.TabInput:GetText() == "2")
 GuildBankOrganizerDepositSettingsFrame.CategoryChecks.armor.scripts.OnClick(
     GuildBankOrganizerDepositSettingsFrame.CategoryChecks.armor
 )
+finishDepositPlanScan()
 GuildBankOrganizerDepositSettingsFrame.LabelInput:SetText("Automatic tab flush")
 currentGuildBankTab = 1
 fire("GUILDBANK_UPDATE_TABS")

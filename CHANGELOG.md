@@ -4,6 +4,10 @@
 
 - Made valid Smart Deposit profile edits save automatically and survive
   `/reload`; **Save Now** remains available as an explicit confirmation.
+- Locked profile editing while a Smart Deposit scan or move queue is active,
+  and reject in-flight profile saves without changing the running route plan.
+- Made exact item-ID input accept only comma- or whitespace-separated positive
+  whole numbers; malformed entries leave the last valid profile unchanged.
 - Made exact item routes override category routes and specific-expansion
   category routes override **All Expansions** fallbacks.
 - Changed equal-priority routing conflicts to identify both destination tabs
@@ -14,6 +18,11 @@
   supplies to intuitive player-facing categories.
 - Added a searchable **Category Reference** to Advanced settings, including
   exact item-ID lookup and the complete Shared Crafting Reagents list.
+- Removed reviewed deprecated, obsolete, unused, test, placeholder, and
+  programmer-only records from public routing and text suggestions while
+  retaining exact numeric diagnostics.
+- Preserved malformed top-level profile SavedVariables in recovery diagnostics
+  before replacing them with a safe profile container.
 - Added checkbox outlines so unchecked expansion filters remain visible while
   selected filters retain clear contrast.
 

@@ -23,6 +23,7 @@ local PROFILE_FIELDS = {
 }
 
 local GUILD_CONTAINER_RECOVERY_KEY = "__guildProfileContainer"
+local TOP_LEVEL_RECOVERY_KEY = "__depositProfilesContainer"
 
 local expansionIDs = {}
 for _, expansion in ipairs(GBO:GetDepositExpansionCatalog()) do
@@ -304,6 +305,13 @@ local function findProfileConflict(GBO, tab, candidate, profiles)
 end
 
 function GBO:SaveDepositProfileDraft(tab, draft)
+    if (self.IsDepositRunning and self:IsDepositRunning())
+        or (self.IsDepositScanning and self:IsDepositScanning())
+    then
+        return false,
+            "Finish or stop the active Smart Deposit before changing profiles."
+    end
+
     tab = tonumber(tab)
     local candidate, reason = self:ValidateDepositProfile(tab, draft)
     if not candidate then
@@ -445,6 +453,15 @@ function GBO:MigrateDepositProfileDatabase(db, previousSchema)
         return
     end
     if type(db.depositProfiles) ~= "table" then
+        if db.depositProfiles ~= nil then
+            if type(db.depositProfileRecovery) ~= "table" then
+                db.depositProfileRecovery = {}
+            end
+            if db.depositProfileRecovery[TOP_LEVEL_RECOVERY_KEY] == nil then
+                db.depositProfileRecovery[TOP_LEVEL_RECOVERY_KEY] =
+                    db.depositProfiles
+            end
+        end
         db.depositProfiles = {}
         return
     end

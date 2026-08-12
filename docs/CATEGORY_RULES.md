@@ -98,8 +98,9 @@ correction table stores only ranges where compact item-ID thresholds overlap.
   conjured records from the generated coverage denominator.
 - A bind-on-equip or bind-on-use item can be bankable before it becomes bound,
   so live bag state remains authoritative.
-- Client data includes deprecated and internal records. A rule makes their
-  classification deterministic; it does not make them obtainable.
+- Reviewed deprecated, obsolete, unused, test, placeholder, and internal
+  records are excluded from public routing and text suggestions. They remain
+  available only through exact numeric reference lookup for diagnostics.
 - The audit covers profession-connected and direct profession-metadata items,
   not every quest token or miscellaneous object in the game.
 

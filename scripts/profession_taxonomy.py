@@ -66,6 +66,95 @@ SHARED_ITEM_IDS = frozenset({
 })
 
 EXCLUDED_ITEM_REASONS = {
+    # Explicit client-name markers identify these as obsolete records. They are
+    # reviewed exact IDs rather than a runtime name filter.
+    741: "deprecated client record",      # Deprecated Copper Ingot
+    786: "deprecated client record",      # Deprecated Pure Copper Ingot
+    807: "deprecated client record",      # Deprecated Iron Ingot
+    1950: "deprecated client record",     # Deprecated Gold Ingot
+    2050: "deprecated client record",     # Deprecated Silver Ingot
+    2404: "deprecated client record",     # Deprecated Pattern: Light Winter Cloak
+    2405: "deprecated client record",     # Deprecated Pattern: Light Winter Boots
+    2461: "deprecated client record",     # Deprecated Elemental Resistance Potion
+    2462: "deprecated client record",     # Deprecated Potion of Lesser Invulnerability (Fix)
+    2554: "deprecated client record",     # Deprecated Recipe: Elixir of Fortitude
+    2599: "deprecated client record",     # Deprecated Pattern: Forest Silk Gloves
+    2600: "deprecated client record",     # Deprecated Pattern: Trogg Vest
+    2602: "deprecated client record",     # Deprecated Pattern: Feathered Robe
+    4418: "deprecated client record",     # Deprecated Creeper Cakes
+    4997: "deprecated client record",     # Deprecated Recipe: Kodo Skin Bag
+    5632: "deprecated client record",     # Deprecated Cowardly Flight Potion
+    21950: "deprecated client record",    # Design: Cut Emerald - Deprecated
+    23364: "deprecated client record",    # zzDEPRECATEDHeart of the Sky
+    23366: "deprecated client record",    # zzDEPRECATEDPerfect Diamond
+    34645: "deprecated client record",    # Deprecated Earthen Ink
+    34660: "deprecated client record",    # Silver Writing Nib DEPRECATED
+    36845: "deprecated client record",    # Deprecated Alchemy Elixir Template
+    37102: "deprecated client record",    # Deprecated Emerald Ink
+    37327: "deprecated client record",    # DEPRECATED Formula: Enchant Weapon - Scourgebane
+    38724: "deprecated client record",    # Deprecated Glyph of Natural Force
+    38952: "deprecated client record",    # Deprecated Scroll of Enchant Bracer - Major Stamina
+    39300: "deprecated client record",    # Spring Loaded Cloak Expander DEPRECATED
+    39352: "deprecated client record",    # Deprecated Ebon Ink
+    39584: "deprecated client record",    # Deprecated Glyph of Thorns
+    39587: "deprecated client record",    # Deprecated Glyph of Savage Mauling
+    40413: "deprecated client record",    # Deprecated Elixir of Mighty Nothing
+    40484: "deprecated client record",    # Deprecated Glyph of the White Bear
+    40538: "deprecated client record",    # DEPRECATED Remote Detonator
+    40754: "deprecated client record",    # DEPRECATED Flame Red Ejector Seat
+    40800: "deprecated client record",    # Belt-Clipped Spynoculars [DEPRECATED]
+    40948: "deprecated client record",    # Deprecated Glyph of the Red Lynx
+    41247: "deprecated client record",    # Titansteel (DEPRECATED)
+    42548: "deprecated client record",    # Deprecated Speed Potion Injector
+    43336: "deprecated client record",    # Deprecated Glyph of the Black Bear
+    43337: "deprecated client record",    # Deprecated Glyph of the Forest Lynx
+    43383: "deprecated client record",    # Deprecated Glyph of the Arctic Wolf
+    43384: "deprecated client record",    # Deprecated Glyph of the Black Wolf
+    43540: "deprecated client record",    # Deprecated Glyph
+    43602: "deprecated client record",    # Deprecated Thriving Ink
+    43603: "deprecated client record",    # Deprecated Demon's Blood Ink
+    43604: "deprecated client record",    # Deprecated Gorefellow Ink
+    43605: "deprecated client record",    # Deprecated Starshine Ink
+    43606: "deprecated client record",    # Deprecated Void Ink
+    43607: "deprecated client record",    # Deprecated Noble's Ink
+    44432: "deprecated client record",    # DEPRECATED Glyph of the Ghoul
+    72097: "deprecated client record",    # DEPRECATED Manticyte Bar
+    72987: "deprecated client record",    # Dense Windwool Bandage DEPRECATED
+    27774: "obsolete client record",      # zzOLDMighty Blood Garnet
+    27811: "obsolete client record",      # zzOLDMighty Blood Garnet
+    28117: "obsolete client record",      # zzOLDBold Ornate Ruby
+    28122: "obsolete client record",      # zzOLDEnscribed Ornate Topaz
+    41403: "obsolete client record",      # ZZOLD Design: Insightful Earthsiege Diamond
+    41404: "obsolete client record",      # ZZOLD Design: Bracing Earthsiege Diamond
+    41405: "obsolete client record",      # ZZOLD Design: Eternal Earthsiege Diamond
+    41406: "obsolete client record",      # ZZOLD Design: Powerful Earthsiege Diamond
+    41407: "obsolete client record",      # ZZOLD Design: Relentless Earthsiege Diamond
+    41408: "obsolete client record",      # ZZOLD Design: Austere Earthsiege Diamond
+    41409: "obsolete client record",      # ZZOLD Design: Persistent Earthsiege Diamond
+    41410: "obsolete client record",      # ZZOLD Design: Trenchant Earthsiege Diamond
+    41411: "obsolete client record",      # ZZOLD Design: Invigorating Earthsiege Diamond
+    41412: "obsolete client record",      # ZZOLD Design: Beaming Earthsiege Diamond
+    41413: "obsolete client record",      # ZZOLD Design: Revitalizing Skyflare Diamond
+    41414: "obsolete client record",      # ZZOLD Design: Effulgent Skyflare Diamond
+    41415: "obsolete client record",      # ZZOLD Design: Tireless Skyflare Diamond
+    41416: "obsolete client record",      # ZZOLD Design: Forlorn Skyflare Diamond
+    41417: "obsolete client record",      # ZZOLD Design: Impassive Skyflare Diamond
+    41418: "obsolete client record",      # ZZOLD Design: Chaotic Skyflare Diamond
+    41419: "obsolete client record",      # ZZOLD Design: Destructive Skyflare Diamond
+    41420: "obsolete client record",      # ZZOLD Design: Ember Skyflare Diamond
+    41421: "obsolete client record",      # ZZOLD Design: Enigmatic Skyflare Diamond
+    41422: "obsolete client record",      # ZZOLD Design: Swift Skyflare Diamond
+    41423: "obsolete client record",      # ZZOLDDesign: Thundering Skyflare Diamond
+    63415: "obsolete client record",      # zzOLDGlyph of Armors
+    71799: "obsolete client record",      # zzOLD Glyph of Stabbing
+    76729: "obsolete client record",      # zzOLD Glyph of the Chameleon
+    85686: "obsolete client record",      # zzOLD Glyph of Chi Wave
+    85708: "obsolete client record",      # zzOLD Glyph of Vampiric Touch
+    85711: "obsolete client record",      # zzOLD Glyph of the Bear Cub
+    85712: "obsolete client record",      # zzOLD Glyph of Flying Serpent Kick
+    87886: "obsolete client record",      # zzOLD Glyph of Spinning Fire Blossom
+    56478: "unused client record",        # Savage Leather (UNUSED)
+    47842: "programmer-only crash item",  # SERVER CRASHING ITEM [PROGRAMMER ONLY -- DO NOT MAKE]
     1165: "internal test item",       # Test Food
     23418: "internal test item",       # Test Sapper Charge
     4363: "broken internal record",   # Broken Modulator

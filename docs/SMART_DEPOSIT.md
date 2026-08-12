@@ -166,6 +166,10 @@ from the guild-bank sort cadence, and include the final server refresh.
   conflict reporting.
 - Automatic persistence for checkbox, text-field, navigation, scan, and page
   hide commits, with **Save Now** as an optional explicit confirmation.
+- Strict comma- or whitespace-separated positive whole-number parsing for
+  exact item IDs; invalid text never replaces the last valid saved profile.
+- Profile mutation controls and the profile-store save boundary are locked
+  while a Smart Deposit scan or move queue is active, then re-enabled.
 - Metadata-backed categories with visible rule descriptions.
 - Single-view setup UI and an immediate bag-scan result.
 - Bag scan and aggregate compact-panel deposit preview.

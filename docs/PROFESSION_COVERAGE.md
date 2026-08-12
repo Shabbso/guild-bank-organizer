@@ -8,9 +8,9 @@ metadata, specialized-bag evidence, and profession ownership.
 - Client build: `5.5.4.68806`
 - Profession recipe-graph item records: **5,920**
 - Total recipe-graph, direct-metadata, and Archaeology candidates: **11,783**
-- Public guild-bank-eligible records: **8,464**
-- Resolved by intrinsic item metadata: **7,593**
-- Resolved by generated profession data: **871**
+- Public guild-bank-eligible records: **8,377**
+- Resolved by intrinsic item metadata: **7,519**
+- Resolved by generated profession data: **858**
 - Eligible records without an organizational category: **0**
 
 Static eligibility excludes bind-on-pickup, quest-bound, Quest-class, and
@@ -24,7 +24,7 @@ instance can be bound even when its base item record is not.
 
 | Category | Intrinsic | Generated | Total |
 | --- | ---: | ---: | ---: |
-| Alchemy | 399 | 21 | 420 |
+| Alchemy | 392 | 21 | 413 |
 | Archaeology | 0 | 13 | 13 |
 | Armor | 2,129 | 0 | 2,129 |
 | Bags | 55 | 0 | 55 |
@@ -32,21 +32,21 @@ instance can be bound even when its base item record is not.
 | Blacksmithing | 236 | 31 | 267 |
 | Cloth | 45 | 0 | 45 |
 | Elemental | 61 | 6 | 67 |
-| Enchanting | 616 | 16 | 632 |
-| Engineering | 117 | 261 | 378 |
-| First Aid | 34 | 6 | 40 |
-| Fish & Cooking | 327 | 231 | 558 |
-| Food | 701 | 0 | 701 |
+| Enchanting | 612 | 16 | 628 |
+| Engineering | 117 | 259 | 376 |
+| First Aid | 33 | 6 | 39 |
+| Fish & Cooking | 326 | 231 | 557 |
+| Food | 700 | 0 | 700 |
 | Herbs | 73 | 13 | 86 |
-| Inscription | 501 | 185 | 686 |
-| Jewels | 1,437 | 24 | 1,461 |
-| Leather | 78 | 0 | 78 |
-| Leatherworking | 221 | 26 | 247 |
+| Inscription | 483 | 174 | 657 |
+| Jewels | 1,409 | 24 | 1,433 |
+| Leather | 77 | 0 | 77 |
+| Leatherworking | 216 | 26 | 242 |
 | Lockboxes | 4 | 0 | 4 |
-| Ore, Bars & Stone | 96 | 1 | 97 |
+| Ore, Bars & Stone | 89 | 1 | 90 |
 | Shared Crafting Reagents | 0 | 19 | 19 |
 | Tailoring | 199 | 18 | 217 |
-| Trinkets | 27 | 0 | 27 |
+| Trinkets | 26 | 0 | 26 |
 | Weapons | 219 | 0 | 219 |
 
 ## Shared Crafting Reagents
@@ -85,8 +85,24 @@ not public routing choices.
 
 | Item ID | Item | Exclusion reason |
 | ---: | --- | --- |
+| 741 | Deprecated Copper Ingot | deprecated client record |
+| 786 | Deprecated Pure Copper Ingot | deprecated client record |
+| 807 | Deprecated Iron Ingot | deprecated client record |
 | 1165 | Test Food | internal test item |
+| 1950 | Deprecated Gold Ingot | deprecated client record |
+| 2050 | Deprecated Silver Ingot | deprecated client record |
+| 2404 | Deprecated Pattern: Light Winter Cloak | deprecated client record |
+| 2405 | Deprecated Pattern: Light Winter Boots | deprecated client record |
+| 2461 | Deprecated Elemental Resistance Potion | deprecated client record |
+| 2462 | Deprecated Potion of Lesser Invulnerability (Fix) | deprecated client record |
+| 2554 | Deprecated Recipe: Elixir of Fortitude | deprecated client record |
+| 2599 | Deprecated Pattern: Forest Silk Gloves | deprecated client record |
+| 2600 | Deprecated Pattern: Trogg Vest | deprecated client record |
+| 2602 | Deprecated Pattern: Feathered Robe | deprecated client record |
 | 4363 | Broken Modulator | broken internal record |
+| 4418 | Deprecated Creeper Cakes | deprecated client record |
+| 4997 | Deprecated Recipe: Kodo Skin Bag | deprecated client record |
+| 5632 | Deprecated Cowardly Flight Potion | deprecated client record |
 | 8547 | Formula: Powerful Smelling Salts [PH] | placeholder item |
 | 13642 | Level 15 Test Gear Cloth - Mage/Priest/Warlock | internal test item |
 | 13643 | Level 15 Test Gear Leather - Druid/Shaman | internal test item |
@@ -145,21 +161,33 @@ not public routing choices.
 | 13696 | Level 60 Test Gear Mail - Shaman | internal test item |
 | 13697 | Level 65 Test Gear Mail - Shaman | internal test item |
 | 20499 | Broken Silithid Chitin | broken internal record |
+| 21950 | Design: Cut Emerald - Deprecated | deprecated client record |
+| 23364 | zzDEPRECATEDHeart of the Sky | deprecated client record |
+| 23366 | zzDEPRECATEDPerfect Diamond | deprecated client record |
 | 23418 | Test Sapper Charge | internal test item |
 | 23684 | Crystal Infused Bandage [PH] | placeholder item |
 | 23696 | [PH] Potion of Heightened Senses [DEP] | placeholder item |
 | 23698 | [PH] Nature Resist Potion [DEP] | placeholder item |
+| 27774 | zzOLDMighty Blood Garnet | obsolete client record |
+| 27811 | zzOLDMighty Blood Garnet | obsolete client record |
+| 28117 | zzOLDBold Ornate Ruby | obsolete client record |
+| 28122 | zzOLDEnscribed Ornate Topaz | obsolete client record |
 | 28388 | TCHILTON TEST RUBY | internal test item |
 | 28389 | TCHILTON TEST DAWNSTONE | internal test item |
 | 34465 | Test Firebloom | internal test item |
 | 34467 | Test Handful of Fel Iron Bolts | internal test item |
 | 34476 | Broken Engine Part | broken internal record |
+| 34645 | Deprecated Earthen Ink | deprecated client record |
+| 34660 | Silver Writing Nib DEPRECATED | deprecated client record |
 | 34840 | Broken Spyglass | broken internal record |
 | 35485 | Goblin Rocket Launcher [PH] | placeholder item |
 | 35499 | Ninja Grenade [PH] | placeholder item |
 | 35626 | Eternal Mana [PH] | placeholder item |
 | 35715 | Deprecated Glyph of Venomous Mana [PH] | placeholder item |
+| 36845 | Deprecated Alchemy Elixir Template | deprecated client record |
+| 37102 | Deprecated Emerald Ink | deprecated client record |
 | 37301 | Deprecated Test Glyph | internal test item |
+| 37327 | DEPRECATED Formula: Enchant Weapon - Scourgebane | deprecated client record |
 | 37550 | DEPRECATED Test Glyph 2 | internal test item |
 | 37551 | DEPRECATED Test Glyph 3 [PH] | placeholder item |
 | 38292 | Test Living Ruby | internal test item |
@@ -170,25 +198,79 @@ not public routing choices.
 | 38502 | QA Test Blank Orange Gem | internal test item |
 | 38503 | QA Test Blank Green Gem | internal test item |
 | 38641 | Deprecated Frostweave Bandage [PH] | placeholder item |
+| 38724 | Deprecated Glyph of Natural Force | deprecated client record |
+| 38952 | Deprecated Scroll of Enchant Bracer - Major Stamina | deprecated client record |
+| 39300 | Spring Loaded Cloak Expander DEPRECATED | deprecated client record |
 | 39304 | Glyph of Natural Force [PH] | placeholder item |
+| 39352 | Deprecated Ebon Ink | deprecated client record |
+| 39584 | Deprecated Glyph of Thorns | deprecated client record |
 | 39585 | Deprecated Glyph of Wild Endurance [PH] | placeholder item |
 | 39586 | Derecated Glyph of Moonfire (Kyle Test) [PH] | placeholder item |
+| 39587 | Deprecated Glyph of Savage Mauling | deprecated client record |
+| 40413 | Deprecated Elixir of Mighty Nothing | deprecated client record |
+| 40484 | Deprecated Glyph of the White Bear | deprecated client record |
+| 40538 | DEPRECATED Remote Detonator | deprecated client record |
 | 40677 | Crafty Potion PLACEHOLDER | placeholder item |
+| 40754 | DEPRECATED Flame Red Ejector Seat | deprecated client record |
+| 40800 | Belt-Clipped Spynoculars [DEPRECATED] | deprecated client record |
+| 40948 | Deprecated Glyph of the Red Lynx | deprecated client record |
 | 41178 | ZX-5103 Mechanical Suit | internal test item |
+| 41247 | Titansteel (DEPRECATED) | deprecated client record |
 | 41374 | [PH] Glass of Red Wine | placeholder item |
+| 41403 | ZZOLD Design: Insightful Earthsiege Diamond | obsolete client record |
+| 41404 | ZZOLD Design: Bracing Earthsiege Diamond | obsolete client record |
+| 41405 | ZZOLD Design: Eternal Earthsiege Diamond | obsolete client record |
+| 41406 | ZZOLD Design: Powerful Earthsiege Diamond | obsolete client record |
+| 41407 | ZZOLD Design: Relentless Earthsiege Diamond | obsolete client record |
+| 41408 | ZZOLD Design: Austere Earthsiege Diamond | obsolete client record |
+| 41409 | ZZOLD Design: Persistent Earthsiege Diamond | obsolete client record |
+| 41410 | ZZOLD Design: Trenchant Earthsiege Diamond | obsolete client record |
+| 41411 | ZZOLD Design: Invigorating Earthsiege Diamond | obsolete client record |
+| 41412 | ZZOLD Design: Beaming Earthsiege Diamond | obsolete client record |
+| 41413 | ZZOLD Design: Revitalizing Skyflare Diamond | obsolete client record |
+| 41414 | ZZOLD Design: Effulgent Skyflare Diamond | obsolete client record |
+| 41415 | ZZOLD Design: Tireless Skyflare Diamond | obsolete client record |
+| 41416 | ZZOLD Design: Forlorn Skyflare Diamond | obsolete client record |
+| 41417 | ZZOLD Design: Impassive Skyflare Diamond | obsolete client record |
+| 41418 | ZZOLD Design: Chaotic Skyflare Diamond | obsolete client record |
+| 41419 | ZZOLD Design: Destructive Skyflare Diamond | obsolete client record |
+| 41420 | ZZOLD Design: Ember Skyflare Diamond | obsolete client record |
+| 41421 | ZZOLD Design: Enigmatic Skyflare Diamond | obsolete client record |
+| 41422 | ZZOLD Design: Swift Skyflare Diamond | obsolete client record |
+| 41423 | ZZOLDDesign: Thundering Skyflare Diamond | obsolete client record |
+| 42548 | Deprecated Speed Potion Injector | deprecated client record |
 | 43098 | Ochre Pigment [PH] | placeholder item |
+| 43336 | Deprecated Glyph of the Black Bear | deprecated client record |
+| 43337 | Deprecated Glyph of the Forest Lynx | deprecated client record |
+| 43383 | Deprecated Glyph of the Arctic Wolf | deprecated client record |
+| 43384 | Deprecated Glyph of the Black Wolf | deprecated client record |
+| 43540 | Deprecated Glyph | deprecated client record |
+| 43602 | Deprecated Thriving Ink | deprecated client record |
+| 43603 | Deprecated Demon's Blood Ink | deprecated client record |
+| 43604 | Deprecated Gorefellow Ink | deprecated client record |
+| 43605 | Deprecated Starshine Ink | deprecated client record |
+| 43606 | Deprecated Void Ink | deprecated client record |
+| 43607 | Deprecated Noble's Ink | deprecated client record |
 | 43614 | Broken Wrath Elixir | broken internal record |
 | 43620 | Broken Spellpower Elixir | broken internal record |
 | 43621 | Broken Noggenfogger Elixir | broken internal record |
 | 44119 | Recipe: Big Bear Steak [PH] | placeholder item |
+| 44432 | DEPRECATED Glyph of the Ghoul | deprecated client record |
+| 47842 | SERVER CRASHING ITEM [PROGRAMMER ONLY -- DO NOT MAKE] | programmer-only crash item |
 | 49627 | Broken Fishbones | broken internal record |
+| 56478 | Savage Leather (UNUSED) | unused client record |
 | 60891 | Pat Test Hydraulic | internal test item |
 | 60893 | Pat Test Cogwheel | internal test item |
+| 63415 | zzOLDGlyph of Armors | obsolete client record |
 | 67435 | Loot-A-Rang (INTERNAL ONLY) | internal-only record |
+| 71799 | zzOLD Glyph of Stabbing | obsolete client record |
+| 72097 | DEPRECATED Manticyte Bar | deprecated client record |
 | 72164 | Type1 Leather [PH] | placeholder item |
 | 72165 | Type2 Leather [PH] | placeholder item |
 | 72174 | Type3 Leather [PH] | placeholder item |
 | 72175 | Type4 Leather [PH] | placeholder item |
+| 72987 | Dense Windwool Bandage DEPRECATED | deprecated client record |
+| 76729 | zzOLD Glyph of the Chameleon | obsolete client record |
 | 76747 | Scaling Food (TEST) | internal test item |
 | 79119 | Test Glyph 1 | internal test item |
 | 79121 | Item A [DO NOT TEST OR LOCALIZE] | internal test item |
@@ -196,7 +278,12 @@ not public routing choices.
 | 79123 | Item C [DO NOT TEST OR LOCALIZE] | internal test item |
 | 80824 | Sha Crystal (TEST VERSION) [PH] | placeholder item |
 | 82396 | Recipe: Format Test | internal test item |
+| 85686 | zzOLD Glyph of Chi Wave | obsolete client record |
+| 85708 | zzOLD Glyph of Vampiric Touch | obsolete client record |
+| 85711 | zzOLD Glyph of the Bear Cub | obsolete client record |
+| 85712 | zzOLD Glyph of Flying Serpent Kick | obsolete client record |
 | 86561 | Test Cookbook | internal test item |
+| 87886 | zzOLD Glyph of Spinning Fire Blossom | obsolete client record |
 
 ## Method and boundaries
 

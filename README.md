@@ -82,7 +82,11 @@ leaves the field. The editor also saves before **Scan Bags Now**, **Load Tab**,
 **Use Current**, **Back to Organizer**, or closing the page. **Save Now** is an
 optional explicit confirmation and uses the same validation. Invalid edits stay
 visible with an explanation and never replace the last valid saved profile.
-Saved profiles are stored per guild and survive logout and `/reload`.
+Exact item IDs must be positive whole numbers separated by commas, whitespace,
+or both. Profile controls are temporarily locked during an active Smart Deposit
+scan or move queue so its routing cannot change in flight; editing becomes
+available again when the operation finishes or is stopped. Saved profiles are
+stored per guild and survive logout and `/reload`.
 
 Each purchased tab can have its own profile, and each profile can accept
 multiple categories. The same category may be routed to different tabs when

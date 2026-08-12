@@ -24,9 +24,38 @@ class TaxonomyPolicyTests(unittest.TestCase):
     def test_ghost_dye_has_the_tailoring_owner(self):
         self.assertEqual(CURATED_CATEGORY_BY_ITEM[9210], "tailoring")
 
-    def test_reviewed_non_public_records_are_explicit(self):
+    def test_previously_reviewed_non_public_records_are_explicit(self):
         for item_id in (1165, 8547, 40677, 67435):
             self.assertIn(item_id, EXCLUDED_ITEM_REASONS)
+
+    def test_clear_obsolete_markers_are_reviewed_without_broad_filtering(self):
+        reviewed_reasons = {
+            "deprecated client record": (
+                741, 786, 807, 1950, 2050, 2404, 2405, 2461, 2462, 2554,
+                2599, 2600, 2602, 4418, 4997, 5632, 21950, 23364, 23366,
+                34645, 34660, 36845, 37102, 37327, 38724, 38952, 39300,
+                39352, 39584, 39587, 40413, 40484, 40538, 40754, 40800,
+                40948, 41247, 42548, 43336, 43337, 43383, 43384, 43540,
+                43602, 43603, 43604, 43605, 43606, 43607, 44432, 72097,
+                72987,
+            ),
+            "obsolete client record": (
+                27774, 27811, 28117, 28122, 41403, 41404, 41405, 41406,
+                41407, 41408, 41409, 41410, 41411, 41412, 41413, 41414,
+                41415, 41416, 41417, 41418, 41419, 41420, 41421, 41422,
+                41423, 63415, 71799, 76729, 85686, 85708, 85711, 85712,
+                87886,
+            ),
+            "unused client record": (56478,),
+            "programmer-only crash item": (47842,),
+        }
+        for reason, item_ids in reviewed_reasons.items():
+            for item_id in item_ids:
+                self.assertEqual(EXCLUDED_ITEM_REASONS.get(item_id), reason)
+
+        # These names contain ambiguous audit words but are normal player items.
+        for item_id in (3172, 4366, 4392, 16023, 16046, 23767, 23810, 34626):
+            self.assertNotIn(item_id, EXCLUDED_ITEM_REASONS)
 
     def test_shared_is_allowlist_only(self):
         generated = GeneratedCategory(
