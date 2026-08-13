@@ -13,18 +13,7 @@ local pickupContainerItem = C_Container and C_Container.PickupContainerItem
 local splitContainerItem = C_Container and C_Container.SplitContainerItem
 local getItemInfoInstant = C_Item and C_Item.GetItemInfoInstant
 local getItemInfo = (C_Item and C_Item.GetItemInfo) or GetItemInfo
-
-local LEGACY_CATEGORY_KEYS = {
-    ["7:4"] = "jewels",
-    ["7:5"] = "cloth",
-    ["7:6"] = "leather",
-    ["7:7"] = "ore",
-    ["7:8"] = "fish",
-    ["7:9"] = "herbs",
-    ["7:10"] = "elemental",
-    ["7:12"] = "enchanting",
-    ["7:16"] = "inscription",
-}
+local getItemFamily = C_Item and C_Item.GetItemFamily
 
 local function now()
     return GetTime()
@@ -52,187 +41,6 @@ local function addTimeline(message)
     while #depositor.timeline > GBO.defaults.maxTimelineEntries do
         table.remove(depositor.timeline, 1)
     end
-end
-
-local function profileScopeKey()
-    local realm = GetRealmName and GetRealmName() or "Unknown Realm"
-    local guild = GetGuildInfo and GetGuildInfo("player") or nil
-    return tostring(realm) .. "\031" .. tostring(guild or "No Guild")
-end
-
-function GBO:GetDepositProfiles(create)
-    if not self.db then
-        return nil
-    end
-    self.db.depositProfiles = self.db.depositProfiles or {}
-    local key = profileScopeKey()
-    if create and type(self.db.depositProfiles[key]) ~= "table" then
-        self.db.depositProfiles[key] = {}
-    end
-    return self.db.depositProfiles[key]
-end
-
-function GBO:GetDepositProfile(tab, create)
-    tab = tonumber(tab)
-    if not tab then
-        return nil
-    end
-    local profiles = self:GetDepositProfiles(create)
-    if not profiles then
-        return nil
-    end
-    if create and type(profiles[tab]) ~= "table" then
-        profiles[tab] = {
-            enabled = false,
-            label = "",
-            categories = {},
-            allExpansions = true,
-            expansions = {},
-            exactItemIDs = {},
-            enabledStateVersion = 1,
-        }
-    end
-    local profile = profiles[tab]
-    if profile then
-        profile.categories = type(profile.categories) == "table"
-            and profile.categories
-            or {}
-        for legacyKey, newKey in pairs(LEGACY_CATEGORY_KEYS) do
-            if profile.categories[legacyKey] then
-                profile.categories[newKey] = true
-                profile.categories[legacyKey] = nil
-            end
-        end
-        profile.enabled = profile.enabled and true or false
-        profile.label = tostring(profile.label or "")
-        profile.enabledStateVersion = tonumber(profile.enabledStateVersion) or 1
-        profile.expansions = type(profile.expansions) == "table"
-            and profile.expansions
-            or {}
-        profile.exactItemIDs = type(profile.exactItemIDs) == "table"
-            and profile.exactItemIDs
-            or {}
-        if profile.allExpansions == nil then
-            profile.allExpansions = next(profile.expansions) == nil
-        else
-            profile.allExpansions = profile.allExpansions and true or false
-        end
-    end
-    return profile
-end
-
-local function expansionSetsOverlap(leftAll, left, rightAll, right)
-    if leftAll or rightAll then
-        return true
-    end
-    for expansionID, selected in pairs(left) do
-        if selected and right[expansionID] then
-            return true
-        end
-    end
-    return false
-end
-
-function GBO:SaveDepositProfile(
-    tab,
-    enabled,
-    label,
-    categories,
-    allExpansions,
-    expansions,
-    exactItemIDs
-)
-    tab = tonumber(tab)
-    if not tab or tab < 1 or tab > GetNumGuildBankTabs() then
-        return false, "Select a purchased guild-bank tab."
-    end
-
-    local profiles = self:GetDepositProfiles(true)
-    local selected = {}
-    for key, value in pairs(categories or {}) do
-        if value then
-            selected[key] = true
-        end
-    end
-    local selectedExpansions = {}
-    for expansionID, value in pairs(expansions or {}) do
-        expansionID = tonumber(expansionID)
-        if value and expansionID then
-            selectedExpansions[expansionID] = true
-        end
-    end
-    allExpansions = allExpansions == nil
-        and next(selectedExpansions) == nil
-        or allExpansions and true or false
-    if not allExpansions and next(selectedExpansions) == nil then
-        return false, "Choose All expansions or at least one expansion."
-    end
-    local selectedItemIDs = {}
-    for itemID, value in pairs(exactItemIDs or {}) do
-        itemID = tonumber(itemID)
-        if value and itemID and itemID > 0 then
-            selectedItemIDs[itemID] = true
-        end
-    end
-
-    for otherTab, otherProfile in pairs(profiles) do
-        otherProfile = self:GetDepositProfile(otherTab, false)
-        if otherTab ~= tab and type(otherProfile) == "table"
-            and type(otherProfile.categories) == "table"
-        then
-            for key in pairs(selected) do
-                if otherProfile.enabled
-                    and otherProfile.categories[key]
-                    and expansionSetsOverlap(
-                        allExpansions,
-                        selectedExpansions,
-                        otherProfile.allExpansions ~= false,
-                        otherProfile.expansions or {}
-                    )
-                then
-                    if allExpansions or otherProfile.allExpansions ~= false then
-                        return false, string.format(
-                            "%s overlaps Tab %d. All expansions includes Mists and every earlier era; select only eras not routed to another tab.",
-                            self:GetDepositCategoryName(key),
-                            otherTab
-                        )
-                    end
-                    return false, string.format(
-                        "%s already routes an overlapping expansion to Tab %d.",
-                        self:GetDepositCategoryName(key),
-                        otherTab
-                    )
-                end
-            end
-            for itemID in pairs(selectedItemIDs) do
-                if otherProfile.enabled
-                    and otherProfile.exactItemIDs
-                    and otherProfile.exactItemIDs[itemID]
-                then
-                    return false, string.format(
-                        "Item ID %d is already assigned to Tab %d.",
-                        itemID,
-                        otherTab
-                    )
-                end
-            end
-        end
-    end
-
-    profiles[tab] = {
-        enabled = enabled
-            and (next(selected) ~= nil or next(selectedItemIDs) ~= nil)
-            and true
-            or false,
-        label = tostring(label or ""),
-        categories = selected,
-        allExpansions = allExpansions,
-        expansions = selectedExpansions,
-        exactItemIDs = selectedItemIDs,
-        enabledStateVersion = 1,
-    }
-    self:RefreshDepositPlan()
-    return true
 end
 
 function GBO:HasEnabledDepositProfiles()
@@ -285,6 +93,9 @@ local function readBagSlot(bag, slot)
         bound = info.isBound and true or false,
         classID = classID,
         subclassID = subclassID,
+        bagFamily = getItemFamily
+            and getItemFamily(info.hyperlink or itemID)
+            or 0,
         equipLoc = equipLoc ~= "" and equipLoc or infoEquipLoc,
         expansionID = resolvedExpansionID,
         expansionEvidence = expansionEvidence,
@@ -416,6 +227,10 @@ local function sameBagItem(slot, expectedItemID, expectedCount)
         and slot.count == expectedCount
 end
 
+local ROUTE_ALL = 1
+local ROUTE_EXPANSION = 2
+local ROUTE_EXACT = 3
+
 local function enabledProfileRouting()
     local profiles = GBO:GetDepositProfiles(false) or {}
     local routing = {
@@ -446,7 +261,12 @@ local function enabledProfileRouting()
             end
             for itemID, enabled in pairs(profile.exactItemIDs) do
                 if enabled then
-                    routing.exactItemIDs[tonumber(itemID)] = tab
+                    itemID = tonumber(itemID)
+                    routing.exactItemIDs[itemID] =
+                        routing.exactItemIDs[itemID] or {}
+                    table.insert(routing.exactItemIDs[itemID], {
+                        tab = tab,
+                    })
                 end
             end
         end
@@ -454,43 +274,107 @@ local function enabledProfileRouting()
     return routing, tabs
 end
 
-local function routeBagItem(routing, item)
-    local exactTab = routing.exactItemIDs[item.itemID]
-    if exactTab then
-        return exactTab, "exact item ID"
-    end
-    if not item.categoryKey then
+function GBO:ResolveDepositRoute(routing, item)
+    if type(routing) ~= "table" or type(item) ~= "table" then
         return nil
     end
-    local categoryRoutes = routing.categories[item.categoryKey] or {}
-    for _, route in ipairs(categoryRoutes) do
-        if route.allExpansions
-            or item.expansionID ~= nil
-                and route.expansions[item.expansionID]
-        then
-            return route.tab, item.categoryEvidence
+
+    local candidates = {}
+    local function addCandidate(tab, priority, evidence)
+        tab = tonumber(tab)
+        if tab then
+            table.insert(candidates, {
+                tab = tab,
+                priority = priority,
+                evidence = evidence,
+            })
         end
     end
-    return nil
+
+    local exactRoutes = routing.exactItemIDs
+        and routing.exactItemIDs[item.itemID]
+        or {}
+    for _, route in ipairs(exactRoutes) do
+        addCandidate(
+            type(route) == "table" and route.tab or route,
+            ROUTE_EXACT,
+            "exact item ID"
+        )
+    end
+
+    local categoryRoutes = item.categoryKey
+        and routing.categories
+        and routing.categories[item.categoryKey]
+        or {}
+    for _, route in ipairs(categoryRoutes) do
+        if route.allExpansions then
+            addCandidate(route.tab, ROUTE_ALL, "All Expansions profile")
+        elseif item.expansionID ~= nil
+            and type(route.expansions) == "table"
+            and route.expansions[item.expansionID]
+        then
+            addCandidate(route.tab, ROUTE_EXPANSION, item.categoryEvidence)
+        end
+    end
+
+    local highestPriority = 0
+    for _, candidate in ipairs(candidates) do
+        highestPriority = math.max(highestPriority, candidate.priority)
+    end
+    if highestPriority == 0 then
+        return nil
+    end
+
+    local tabs = {}
+    local seenTabs = {}
+    local evidence
+    for _, candidate in ipairs(candidates) do
+        if candidate.priority == highestPriority then
+            evidence = evidence or candidate.evidence
+            if not seenTabs[candidate.tab] then
+                seenTabs[candidate.tab] = true
+                table.insert(tabs, candidate.tab)
+            end
+        end
+    end
+    table.sort(tabs)
+    if #tabs > 1 then
+        return nil, nil, {
+            itemID = item.itemID,
+            name = item.name or ("Item " .. tostring(item.itemID)),
+            categoryKey = item.categoryKey,
+            expansionID = item.expansionID,
+            priority = highestPriority,
+            tabs = tabs,
+        }
+    end
+    return tabs[1], evidence, nil
 end
 
 local function readEligibleBagItems(routing)
     local items = {}
+    local conflicts = {}
+    local conflictedItemIDs = {}
     local maximumBag = NUM_BAG_SLOTS or 4
     for bag = 0, maximumBag do
         local numSlots = getContainerNumSlots and getContainerNumSlots(bag) or 0
         for slot = 1, numSlots do
             local item = readBagSlot(bag, slot)
-            local tab, routeEvidence
-            if item then
-                tab, routeEvidence = routeBagItem(routing, item)
-            end
-            if item and tab and not item.locked and not item.bound and item.link then
-                item.targetTab = tab
-                item.routeEvidence = routeEvidence
-                item.planCategoryKey =
-                    item.categoryKey or ("item:" .. tostring(item.itemID))
-                table.insert(items, item)
+            if item and not item.locked and not item.bound and item.link then
+                local tab, routeEvidence, conflict =
+                    GBO:ResolveDepositRoute(routing, item)
+                if conflict then
+                    if not conflictedItemIDs[conflict.itemID] then
+                        conflictedItemIDs[conflict.itemID] = true
+                        table.insert(conflicts, conflict)
+                    end
+                elseif tab then
+                    item.targetTab = tab
+                    item.routeEvidence = routeEvidence
+                    item.planCategoryKey =
+                        item.categoryKey or ("item:" .. tostring(item.itemID))
+                    table.insert(items, item)
+                end
             end
         end
     end
@@ -503,7 +387,7 @@ local function readEligibleBagItems(routing)
         end
         return left.slot < right.slot
     end)
-    return items
+    return items, conflicts
 end
 
 local function cloneBankSlots(tab)
@@ -633,7 +517,7 @@ end
 
 local function buildDepositPlan()
     local routing, profiles = enabledProfileRouting()
-    local sources = readEligibleBagItems(routing)
+    local sources, routingConflicts = readEligibleBagItems(routing)
     local byTab = {}
     for tab in pairs(profiles) do
         byTab[tab] = {}
@@ -650,6 +534,7 @@ local function buildDepositPlan()
         totalItems = 0,
         totalStacks = 0,
         skippedItems = 0,
+        routingConflicts = routingConflicts,
     }
     for tab = 1, GetNumGuildBankTabs() do
         local profile = profiles[tab]
@@ -666,8 +551,88 @@ local function buildDepositPlan()
     return plan
 end
 
+local function filterDepositPlan(plan, selectedTabs)
+    local filtered = {
+        builtAt = plan and plan.builtAt,
+        tabs = {},
+        order = {},
+        totalMoves = 0,
+        totalItems = 0,
+        totalStacks = 0,
+        skippedItems = 0,
+        routingConflicts = {},
+    }
+    if not plan then
+        return filtered
+    end
+
+    for _, plannedTab in ipairs(plan.order) do
+        if not selectedTabs or selectedTabs[plannedTab] then
+            local tabPlan = plan.tabs[plannedTab]
+            filtered.tabs[plannedTab] = tabPlan
+            table.insert(filtered.order, plannedTab)
+            filtered.totalMoves = filtered.totalMoves + tabPlan.moves
+            filtered.totalItems = filtered.totalItems + tabPlan.itemCount
+            filtered.totalStacks = filtered.totalStacks + tabPlan.sourceStacks
+            filtered.skippedItems = filtered.skippedItems + tabPlan.skippedItems
+        end
+    end
+    for _, conflict in ipairs(plan.routingConflicts or {}) do
+        local included = not selectedTabs
+        if selectedTabs then
+            for _, conflictTab in ipairs(conflict.tabs) do
+                if selectedTabs[conflictTab] then
+                    included = true
+                    break
+                end
+            end
+        end
+        if included then
+            table.insert(filtered.routingConflicts, conflict)
+        end
+    end
+    return filtered
+end
+
 function GBO:GetDepositPlan()
     return depositor.plan
+end
+
+function GBO:GetFirstDepositRoutingConflict()
+    local plan = depositor.plan
+    return plan
+        and plan.routingConflicts
+        and plan.routingConflicts[1]
+        or nil
+end
+
+function GBO:GetDepositPlanScope(tab)
+    local plan = depositor.plan
+    if not plan then
+        return nil
+    end
+
+    local selectedTabs
+    if tab ~= nil then
+        selectedTabs = {}
+        local selectedTab = tonumber(tab)
+        if selectedTab then
+            selectedTabs[selectedTab] = true
+        end
+    end
+    local scoped = filterDepositPlan(plan, selectedTabs)
+    local destinationCount = 0
+    for _, plannedTab in ipairs(scoped.order) do
+        if scoped.tabs[plannedTab].moves > 0 then
+            destinationCount = destinationCount + 1
+        end
+    end
+    return {
+        totalMoves = scoped.totalMoves,
+        totalItems = scoped.totalItems,
+        destinationCount = destinationCount,
+        routingConflictCount = #scoped.routingConflicts,
+    }
 end
 
 function GBO:GetDepositPlanSummary()
@@ -769,6 +734,12 @@ end
 
 local function buildReport(ok, reason)
     local client = GBO.client or {}
+    local routingConflicts = depositor.routingConflicts or {}
+    local firstRoutingConflict = routingConflicts[1]
+    local firstRoutingConflictTabs = {}
+    for _, tab in ipairs(firstRoutingConflict and firstRoutingConflict.tabs or {}) do
+        table.insert(firstRoutingConflictTabs, tostring(tab))
+    end
     local lines = {
         "Guild Bank Organizer smart deposit report",
         string.format("addon=%s", GBO.version),
@@ -795,6 +766,14 @@ local function buildReport(ok, reason)
             depositor.averageSeconds or 0,
             depositor.skippedItems or 0
         ),
+        string.format(
+            "routingConflicts=%d firstRoutingConflictItemID=%s firstRoutingConflictTabs=%s",
+            #routingConflicts,
+            tostring(firstRoutingConflict and firstRoutingConflict.itemID or "none"),
+            #firstRoutingConflictTabs > 0
+                and table.concat(firstRoutingConflictTabs, ",")
+                or "none"
+        ),
         string.format("bagEvents=%d slotEvents=%d uiErrors=%d %s",
             depositor.bagEvents,
             depositor.slotEvents,
@@ -818,6 +797,8 @@ local function buildReport(ok, reason)
         depositedItems = depositor.depositedItems,
         averageMoveSeconds = depositor.averageSeconds,
         skippedItems = depositor.skippedItems,
+        routingConflictCount = #routingConflicts,
+        firstRoutingConflict = firstRoutingConflict,
         report = report,
     }
 end
@@ -1068,32 +1049,7 @@ function GBO:IssueDepositMove(move, isRetry)
 end
 
 local function selectedPlan()
-    local plan = buildDepositPlan()
-    if not depositor.selectedTabs then
-        return plan
-    end
-
-    local filtered = {
-        builtAt = plan.builtAt,
-        tabs = {},
-        order = {},
-        totalMoves = 0,
-        totalItems = 0,
-        totalStacks = 0,
-        skippedItems = 0,
-    }
-    for _, tab in ipairs(plan.order) do
-        if depositor.selectedTabs[tab] then
-            local tabPlan = plan.tabs[tab]
-            filtered.tabs[tab] = tabPlan
-            table.insert(filtered.order, tab)
-            filtered.totalMoves = filtered.totalMoves + tabPlan.moves
-            filtered.totalItems = filtered.totalItems + tabPlan.itemCount
-            filtered.totalStacks = filtered.totalStacks + tabPlan.sourceStacks
-            filtered.skippedItems = filtered.skippedItems + tabPlan.skippedItems
-        end
-    end
-    return filtered
+    return filterDepositPlan(buildDepositPlan(), depositor.selectedTabs)
 end
 
 local function finishVerification()
@@ -1232,6 +1188,10 @@ function GBO:StartDeposit(tab, refreshed)
         self:Print("No assigned bag items currently have guild-bank space.")
         return false
     end
+    local scopedPlan = filterDepositPlan(plan, selectedTabs)
+    local routingConflicts = tab
+        and scopedPlan.routingConflicts
+        or plan.routingConflicts
 
     depositor.generation = depositor.generation + 1
     depositor.running = true
@@ -1239,15 +1199,16 @@ function GBO:StartDeposit(tab, refreshed)
     depositor.stage = "planning"
     depositor.startedAt = now()
     depositor.selectedTabs = selectedTabs
-    depositor.estimatedTotal = plan.totalMoves
-    depositor.estimatedRemaining = plan.totalMoves
+    depositor.estimatedTotal = scopedPlan.totalMoves
+    depositor.estimatedRemaining = scopedPlan.totalMoves
     depositor.issued = 0
     depositor.confirmed = 0
     depositor.depositedItems = 0
     depositor.totalSeconds = 0
     depositor.averageSeconds = nil
     depositor.retries = 0
-    depositor.skippedItems = plan.skippedItems
+    depositor.skippedItems = scopedPlan.skippedItems
+    depositor.routingConflicts = routingConflicts
     depositor.bagEvents = 0
     depositor.slotEvents = 0
     depositor.uiErrors = {}
@@ -1259,14 +1220,26 @@ function GBO:StartDeposit(tab, refreshed)
 
     addTimeline(string.format(
         "smart deposit started: %d planned moves for %d items; %.2fs quiet period",
-        plan.totalMoves,
-        plan.totalItems,
+        scopedPlan.totalMoves,
+        scopedPlan.totalItems,
         self.defaults.depositQuietPeriod
     ))
+    if routingConflicts[1] then
+        local conflictTabs = {}
+        for _, conflictTab in ipairs(routingConflicts[1].tabs) do
+            table.insert(conflictTabs, tostring(conflictTab))
+        end
+        addTimeline(string.format(
+            "routing conflicts=%d; first item=%s tabs=%s",
+            #routingConflicts,
+            tostring(routingConflicts[1].itemID),
+            table.concat(conflictTabs, ",")
+        ))
+    end
     self:Print(string.format(
         "Smart Deposit: %d items in %d planned deposits.",
-        plan.totalItems,
-        plan.totalMoves
+        scopedPlan.totalItems,
+        scopedPlan.totalMoves
     ))
     self:PlanNextDeposit()
     return true

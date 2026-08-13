@@ -9,6 +9,7 @@ local CLASS = {
     ARMOR = itemClass.Armor or 4,
     TRADEGOODS = itemClass.Tradegoods or 7,
     ITEM_ENHANCEMENT = itemClass.ItemEnhancement or 8,
+    RECIPE = itemClass.Recipe or 9,
     MISCELLANEOUS = itemClass.Miscellaneous or 15,
     GLYPH = itemClass.Glyph or 16,
     BATTLE_PET = itemClass.Battlepet or 17,
@@ -22,8 +23,10 @@ local TRADEGOODS = {
     COOKING = 8,
     HERB = 9,
     ELEMENTAL = 10,
+    OTHER = 11,
     ENCHANTING = 12,
-    INSCRIPTION = 16,
+    MATERIALS = 13,
+    ITEM_ENCHANTMENT = 14,
 }
 
 local CONSUMABLE = {
@@ -31,6 +34,22 @@ local CONSUMABLE = {
     ELIXIR = 2,
     FLASK = 3,
     FOOD_AND_DRINK = 5,
+    ITEM_ENHANCEMENT = 6,
+    BANDAGE = 7,
+}
+
+local RECIPE = {
+    LEATHERWORKING = 1,
+    TAILORING = 2,
+    ENGINEERING = 3,
+    BLACKSMITHING = 4,
+    COOKING = 5,
+    ALCHEMY = 6,
+    FIRST_AID = 7,
+    ENCHANTING = 8,
+    FISHING = 9,
+    JEWELCRAFTING = 10,
+    INSCRIPTION = 11,
 }
 
 -- Lockboxes do not have a dependable lockbox-only class/subclass in this
@@ -50,7 +69,7 @@ local LOCKBOX_ITEM_IDS = {
 --
 -- false means "do not route through a broad category." Exact item-ID profile
 -- rules can still opt such an item in, although soulbound items remain blocked.
-local CATEGORY_ITEM_OVERRIDES = {
+local GAMEPLAY_ITEM_OVERRIDES = {
     [38682] = "enchanting", -- Enchanting Vellum: Trade Goods / Other in Classic
     [83064] = "fish", -- Spinefish: Alchemy reagent obtained through fishing
     [103641] = false, -- Singing Crystal: soulbound Timeless Isle combat buff
@@ -69,12 +88,49 @@ local function tradegoodsIs(subclassID)
     end
 end
 
+local function recipeIs(subclassID)
+    return function(item)
+        return item.classID == CLASS.RECIPE
+            and item.subclassID == subclassID
+    end
+end
+
+local BAG_FAMILY_CATEGORIES = {
+    { bit = 8, key = "leatherworking" },
+    { bit = 16, key = "inscription" },
+    { bit = 32, key = "herbs" },
+    { bit = 64, key = "enchanting" },
+    { bit = 128, key = "engineering" },
+    { bit = 512, key = "jewels" },
+    { bit = 1024, key = "ore" },
+    { bit = 32768, key = "fish" },
+    { bit = 65536, key = "fish" },
+}
+
+local function specializedBagCategory(item)
+    if item.classID == CLASS.CONTAINER then
+        return nil
+    end
+    local family = tonumber(item.bagFamily) or 0
+    local category
+    for _, candidate in ipairs(BAG_FAMILY_CATEGORIES) do
+        if math.floor(family / candidate.bit) % 2 == 1 then
+            if category and category ~= candidate.key then
+                return nil
+            end
+            category = candidate.key
+        end
+    end
+    return category
+end
+
 local categories = {
     {
         key = "trinkets",
         name = "Trinkets",
         description = "Items equipped in a trinket slot.",
         evidence = "Equipment slot",
+        examples = { "Talisman of Ephemeral Power", "Darkmoon Card: Blue Dragon" },
         matches = function(item)
             return item.equipLoc == "INVTYPE_TRINKET"
         end,
@@ -84,6 +140,7 @@ local categories = {
         name = "Armor",
         description = "Wearable armor. Cloth material and bags are excluded.",
         evidence = "Item class",
+        examples = { "Mooncloth Robe", "Helm of Wrath" },
         matches = classIs(CLASS.ARMOR),
     },
     {
@@ -91,6 +148,7 @@ local categories = {
         name = "Weapons",
         description = "All weapon classes and weapon types.",
         evidence = "Item class",
+        examples = { "Arcanite Reaper", "Thunderfury, Blessed Blade of the Windseeker" },
         matches = classIs(CLASS.WEAPON),
     },
     {
@@ -98,6 +156,7 @@ local categories = {
         name = "Elemental",
         description = "Motes, primals, crystallized, eternal, volatile, and spirit materials.",
         evidence = "Trade Goods subclass",
+        examples = { "Mote of Fire", "Volatile Life" },
         matches = tradegoodsIs(TRADEGOODS.ELEMENTAL),
     },
     {
@@ -105,6 +164,7 @@ local categories = {
         name = "Battle Pets",
         description = "Caged battle pets and legacy companion-pet items.",
         evidence = "Item class",
+        examples = { "Dark Whelpling", "Hyacinth Macaw" },
         matches = function(item)
             return item.classID == CLASS.BATTLE_PET
                 or item.classID == CLASS.MISCELLANEOUS
@@ -116,6 +176,7 @@ local categories = {
         name = "Lockboxes",
         description = "Known locked containers. Add unusual ones by exact item ID.",
         evidence = "Curated item IDs",
+        examples = { "Strong Iron Lockbox", "Elementium Lockbox" },
         matches = function(item)
             return LOCKBOX_ITEM_IDS[item.itemID] == true
         end,
@@ -125,6 +186,7 @@ local categories = {
         name = "Bags",
         description = "Equippable bags and containers; known lockboxes are excluded.",
         evidence = "Item class",
+        examples = { "Netherweave Bag", "Embersilk Bag" },
         matches = classIs(CLASS.CONTAINER),
     },
     {
@@ -132,17 +194,26 @@ local categories = {
         name = "Cloth",
         description = "Raw cloth and bolts from every expansion, not cloth armor.",
         evidence = "Trade Goods subclass",
+        examples = { "Linen Cloth", "Bolt of Windwool Cloth" },
         matches = tradegoodsIs(TRADEGOODS.CLOTH),
     },
     {
         key = "enchanting",
         name = "Enchanting",
-        description = "Dust, essence, shards, crystals, and item enchantments.",
-        evidence = "Trade Goods or enhancement class",
+        description = "Dust, essence, shards, crystals, enchantments, oils, and formulas.",
+        evidence = "Item metadata and generated profession data",
+        examples = { "Strange Dust", "Ruined Vellum" },
         matches = function(item)
             return item.classID == CLASS.TRADEGOODS
-                    and item.subclassID == TRADEGOODS.ENCHANTING
+                    and (
+                        item.subclassID == TRADEGOODS.ENCHANTING
+                        or item.subclassID == TRADEGOODS.ITEM_ENCHANTMENT
+                    )
                 or item.classID == CLASS.ITEM_ENHANCEMENT
+                or item.classID == CLASS.CONSUMABLE
+                    and item.subclassID == CONSUMABLE.ITEM_ENHANCEMENT
+                or item.classID == CLASS.RECIPE
+                    and item.subclassID == RECIPE.ENCHANTING
         end,
     },
     {
@@ -150,6 +221,7 @@ local categories = {
         name = "Food",
         description = "Finished food and drink consumables.",
         evidence = "Consumable subclass",
+        examples = { "Roasted Boar Meat", "Mogu Fish Stew" },
         matches = function(item)
             return item.classID == CLASS.CONSUMABLE
                 and item.subclassID == CONSUMABLE.FOOD_AND_DRINK
@@ -157,16 +229,26 @@ local categories = {
     },
     {
         key = "fish",
-        name = "Fish & Raw Cooking",
-        description = "Raw fish, meat, and cooking ingredients grouped together by the game.",
-        evidence = "Trade Goods subclass",
-        matches = tradegoodsIs(TRADEGOODS.COOKING),
+        name = "Fish & Cooking",
+        description = "Raw fish, meat, cooking ingredients, spices, lures, and cooking or fishing recipes.",
+        evidence = "Item metadata and generated profession data",
+        examples = { "Raw Brilliant Smallfish", "Spinefish" },
+        matches = function(item)
+            return item.classID == CLASS.TRADEGOODS
+                    and item.subclassID == TRADEGOODS.COOKING
+                or item.classID == CLASS.RECIPE
+                    and (
+                        item.subclassID == RECIPE.COOKING
+                        or item.subclassID == RECIPE.FISHING
+                    )
+        end,
     },
     {
         key = "herbs",
         name = "Herbs",
         description = "Herbs from every expansion.",
         evidence = "Trade Goods subclass",
+        examples = { "Mageroyal", "Green Tea Leaf" },
         matches = tradegoodsIs(TRADEGOODS.HERB),
     },
     {
@@ -174,6 +256,7 @@ local categories = {
         name = "Alchemy",
         description = "Potions, elixirs, and flasks. Herbs remain in Herbs.",
         evidence = "Consumable subclass",
+        examples = { "Crystal Vial", "Flask of the Winds" },
         matches = function(item)
             return item.classID == CLASS.CONSUMABLE
                 and (
@@ -181,6 +264,8 @@ local categories = {
                     or item.subclassID == CONSUMABLE.ELIXIR
                     or item.subclassID == CONSUMABLE.FLASK
                 )
+                or item.classID == CLASS.RECIPE
+                    and item.subclassID == RECIPE.ALCHEMY
         end,
     },
     {
@@ -188,10 +273,13 @@ local categories = {
         name = "Jewels",
         description = "Cut and uncut gems plus Jewelcrafting trade goods.",
         evidence = "Item or Trade Goods class",
+        examples = { "Tigerseye", "Bold Carnelian" },
         matches = function(item)
             return item.classID == CLASS.GEM
                 or item.classID == CLASS.TRADEGOODS
                     and item.subclassID == TRADEGOODS.JEWELCRAFTING
+                or item.classID == CLASS.RECIPE
+                    and item.subclassID == RECIPE.JEWELCRAFTING
         end,
     },
     {
@@ -199,26 +287,27 @@ local categories = {
         name = "Ore, Bars & Stone",
         description = "Ore, bars, and stone; the game stores these in one material subclass.",
         evidence = "Trade Goods subclass",
+        examples = { "Copper Ore", "Ghost Iron Bar" },
         matches = tradegoodsIs(TRADEGOODS.METAL_AND_STONE),
     },
     {
         key = "blacksmithing",
-        name = "Blacksmithing (exact items)",
-        description = "Non-armor crafted items you add by item ID; profession origin is not universal metadata.",
-        evidence = "Exact item IDs",
-        matches = function()
-            return false
-        end,
+        name = "Blacksmithing",
+        description = "Plans, sharpening stones, weightstones, flux, keys, and other non-equipment products. Armor and weapons stay in their own categories.",
+        evidence = "Recipe and generated profession data",
+        examples = { "Plans: Copper Chain Vest", "Rough Sharpening Stone" },
+        matches = recipeIs(RECIPE.BLACKSMITHING),
     },
     {
         key = "inscription",
         name = "Inscription",
-        description = "Pigments, inks, and glyphs.",
-        evidence = "Trade Goods or Glyph class",
+        description = "Pigments, inks, glyphs, scrolls, parchment, and techniques.",
+        evidence = "Glyph, recipe, and generated profession data",
+        examples = { "Light Parchment", "Ink of Dreams" },
         matches = function(item)
             return item.classID == CLASS.GLYPH
-                or item.classID == CLASS.TRADEGOODS
-                    and item.subclassID == TRADEGOODS.INSCRIPTION
+                or item.classID == CLASS.RECIPE
+                    and item.subclassID == RECIPE.INSCRIPTION
         end,
     },
     {
@@ -226,7 +315,68 @@ local categories = {
         name = "Leather",
         description = "Leather, hides, and related raw leatherworking materials.",
         evidence = "Trade Goods subclass",
+        examples = { "Light Leather", "Exotic Leather" },
         matches = tradegoodsIs(TRADEGOODS.LEATHER),
+    },
+    {
+        key = "engineering",
+        name = "Engineering",
+        description = "Parts, explosives, devices, scopes, schematics, and other Engineering products. Equipment stays in Armor or Weapons.",
+        evidence = "Recipe and generated profession data",
+        examples = { "Handful of Copper Bolts", "Rough Blasting Powder" },
+        matches = function(item)
+            return item.classID == CLASS.RECIPE
+                and item.subclassID == RECIPE.ENGINEERING
+        end,
+    },
+    {
+        key = "tailoring",
+        name = "Tailoring",
+        description = "Patterns, dyes, nets, and other Tailoring supplies or products. Raw cloth and bags stay in their own categories.",
+        evidence = "Recipe and generated profession data",
+        examples = { "Red Dye", "Purple Dye" },
+        matches = recipeIs(RECIPE.TAILORING),
+    },
+    {
+        key = "leatherworking",
+        name = "Leatherworking",
+        description = "Patterns, drums, kits, and other Leatherworking supplies or products. Raw leather and armor stay in their own categories.",
+        evidence = "Recipe and generated profession data",
+        examples = { "Pattern: Fine Leather Boots", "Pattern: Hillman's Leather Vest" },
+        matches = recipeIs(RECIPE.LEATHERWORKING),
+    },
+    {
+        key = "first_aid",
+        name = "First Aid",
+        description = "Bandages, anti-venoms, venom sacs, and First Aid manuals.",
+        evidence = "Item metadata and generated profession data",
+        examples = { "Heavy Linen Bandage", "Manual: Heavy Frostweave Bandage" },
+        matches = function(item)
+            return item.classID == CLASS.CONSUMABLE
+                    and item.subclassID == CONSUMABLE.BANDAGE
+                or item.classID == CLASS.RECIPE
+                    and item.subclassID == RECIPE.FIRST_AID
+        end,
+    },
+    {
+        key = "profession_supplies",
+        name = "Shared Crafting Reagents",
+        description = "Crafting reagents with no single defensible profession owner, such as Chaos Orbs and Primal Nethers.",
+        evidence = "Generated multi-profession recipe data",
+        examples = { "Chaos Orb", "Primal Nether" },
+        matches = function()
+            return false
+        end,
+    },
+    {
+        key = "archaeology",
+        name = "Archaeology",
+        description = "Bankable Archaeology keystones, including tablets, rune stones, scrolls, pottery shards, statue pieces, and amber slivers. Archaeology fragment currencies are not bag items.",
+        evidence = "Generated MoP archaeology item data",
+        examples = { "Pandaren Pottery Shard", "Highborne Scroll" },
+        matches = function()
+            return false
+        end,
     },
 }
 
@@ -265,30 +415,74 @@ function GBO:GetDepositCategory(key)
     return categoryByKey[key]
 end
 
+function GBO:DescribeProfessionReference(itemID)
+    local record = self:GetProfessionReferenceItem(itemID)
+    if not record then
+        return nil
+    end
+
+    local reference = {}
+    for key, value in pairs(record) do
+        reference[key] = value
+    end
+    local gameplayOverride = GAMEPLAY_ITEM_OVERRIDES[reference.itemID]
+    if gameplayOverride ~= nil then
+        reference.categoryKey = gameplayOverride or nil
+        reference.evidence = "curated gameplay item ID"
+    end
+    reference.categoryName = reference.categoryKey
+        and self:GetDepositCategoryName(reference.categoryKey)
+        or nil
+    reference.expansionID, reference.expansionEvidence =
+        self:ResolveDepositExpansion(reference.itemID, nil, nil)
+    reference.expansionName = reference.expansionID ~= nil
+        and self:GetDepositExpansionName(reference.expansionID)
+        or nil
+    reference.exactTabs = self:GetExactDepositProfileTabs(reference.itemID)
+    return reference
+end
+
 function GBO:ClassifyDepositItem(item)
     if not item then
         return nil
     end
-    local override = CATEGORY_ITEM_OVERRIDES[tonumber(item.itemID)]
-    if override ~= nil then
-        return override or nil, "curated item ID"
+    local curated, curatedFound = self:GetCuratedProfessionCategory(item.itemID)
+    if curatedFound then
+        return curated or nil, curated and "curated player-facing category"
+            or "excluded internal or unavailable item"
+    end
+    local gameplayOverride = GAMEPLAY_ITEM_OVERRIDES[tonumber(item.itemID)]
+    if gameplayOverride ~= nil then
+        return gameplayOverride or nil, "curated gameplay item ID"
     end
     for _, category in ipairs(categories) do
         if category.matches(item) then
             return category.key, category.evidence
         end
     end
+    local generated = self:GetGeneratedProfessionCategory(item.itemID)
+    if generated then
+        return generated, "MoP profession item data"
+    end
+    local familyCategory = specializedBagCategory(item)
+    if familyCategory then
+        return familyCategory, "specialized bag family"
+    end
     return nil
 end
 
 function GBO:IsUnclassifiedDepositMaterial(item)
-    if not item or item.categoryKey then
+    if not item or item.categoryKey or item.categoryEvidence then
         return false
     end
     return item.classID == CLASS.TRADEGOODS
         or item.classID == CLASS.GEM
         or item.classID == CLASS.ITEM_ENHANCEMENT
         or item.classID == CLASS.GLYPH
+        or item.classID == CLASS.RECIPE
+        or item.classID == CLASS.CONSUMABLE
+            and item.subclassID >= CONSUMABLE.POTION
+            and item.subclassID <= CONSUMABLE.BANDAGE
 end
 
 function GBO:GetDepositExpansionCatalog()

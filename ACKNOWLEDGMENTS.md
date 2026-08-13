@@ -11,9 +11,16 @@ movement safeguards.
 No ElvUI or BankStack source files are bundled with this addon, and neither
 project is required at runtime. Smart Deposit's compact item-era correction
 ranges are generated from Blizzard client DB2 data served by Wago Tools; Wago
-Tools is not contacted by the addon and is not required at runtime.
+Tools is not contacted by the addon and is not required at runtime. Smart
+Deposit's profession catalog is generated from Blizzard client Item,
+ItemSparse, SkillLineAbility, SpellReagents, and SpellEffect DB2 data served by
+Wago Tools, plus the MoP Archaeology keystone set whose fragment system does
+not use ordinary bag reagents. Table interpretation follows the
+community-maintained schemas in
+the wowdev/WoWDBDefs project; neither Wago Tools nor WoWDBDefs is bundled or
+required at runtime.
 
 World of Warcraft and related marks are
 trademarks of Blizzard Entertainment. This project is not affiliated with or
-endorsed by Blizzard Entertainment, Wago Tools, ElvUI, BankStack, Overwolf, or
-CurseForge.
+endorsed by Blizzard Entertainment, Wago Tools, WoWDBDefs, ElvUI, BankStack,
+Overwolf, or CurseForge.

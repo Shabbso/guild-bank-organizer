@@ -1,5 +1,108 @@
 # Changelog
 
+## 1.2.0 - 2026-08-13
+
+This release substantially expands Smart Deposit while preserving the
+server-safe sorting and confirmation behavior from 1.1.1.
+
+- Added separate **Deposit This Tab** and **Deposit All Tabs** actions, with
+  scope-specific item counts, deposit counts, progress, reports, and a shared
+  **Stop** control.
+- Added a generated MoP Classic profession catalog covering 8,377 public,
+  bank-eligible profession records with zero uncovered items or unreviewed
+  multi-profession assignments.
+- Added Engineering, Tailoring, Leatherworking, First Aid, Archaeology, and
+  **Shared Crafting Reagents** categories, plus more intuitive ownership for
+  parchment, vellum, dyes, vials, pigments, inks, and similar supplies.
+- Added a searchable **Category Reference** in Advanced settings with category
+  definitions, examples, expansion information, exact item-ID diagnostics,
+  and the complete Shared Crafting Reagents list.
+- Made valid Smart Deposit profile edits save automatically and persist across
+  `/reload`; **Save Now** remains available for explicit confirmation.
+- Added safe schema migration and recovery diagnostics for malformed legacy
+  profile data instead of silently discarding it.
+- Made exact item-ID routes override category routes, and specific-expansion
+  routes override **All Expansions** fallbacks.
+- Added actionable equal-priority conflict reporting that names both tabs and
+  leaves only the conflicted item in the player's bags.
+- Added strict exact item-ID validation. Invalid, negative, decimal, zero, or
+  alphanumeric entries leave the last valid saved profile unchanged.
+- Locked profile setup while a scan or deposit is active so an authorized
+  operation cannot change destinations mid-run.
+- Removed reviewed deprecated, obsolete, unused, test, placeholder, and
+  programmer-only records from public routing and text suggestions while
+  retaining exact numeric diagnostics.
+- Added visible outlines to unchecked expansion filters while preserving clear
+  selected-state contrast.
+- Expanded automated coverage for classification, expansion eras, migration,
+  autosave, route precedence, conflicts, current-tab/all-tabs scope, reference
+  search, exact-ID validation, and active-operation safety.
+
+## 1.2.0-beta.3 - 2026-08-12
+
+- Made valid Smart Deposit profile edits save automatically and survive
+  `/reload`; **Save Now** remains available as an explicit confirmation.
+- Locked profile editing while a Smart Deposit scan or move queue is active,
+  and reject in-flight profile saves without changing the running route plan.
+- Made exact item-ID input accept only comma- or whitespace-separated positive
+  whole numbers; malformed entries leave the last valid profile unchanged.
+- Made exact item routes override category routes and specific-expansion
+  category routes override **All Expansions** fallbacks.
+- Changed equal-priority routing conflicts to identify both destination tabs
+  and leave the conflicted item in the player's bags.
+- Replaced broad **Shared Profession Supplies** assignment with the smaller,
+  reviewed **Shared Crafting Reagents** set.
+- Assigned obvious parchment, vellum, dye, vial, and similar profession
+  supplies to intuitive player-facing categories.
+- Added a searchable **Category Reference** to Advanced settings, including
+  exact item-ID lookup and the complete Shared Crafting Reagents list.
+- Removed reviewed deprecated, obsolete, unused, test, placeholder, and
+  programmer-only records from public routing and text suggestions while
+  retaining exact numeric diagnostics.
+- Preserved malformed top-level profile SavedVariables in recovery diagnostics
+  before replacing them with a safe profile container.
+- Added checkbox outlines so unchecked expansion filters remain visible while
+  selected filters retain clear contrast.
+
+## 1.2.0-beta.2 - 2026-08-12
+
+- Replaced the ambiguous Smart Deposit action with separate **Deposit This
+  Tab** and **Deposit All Tabs** buttons.
+- Made the currently open tab the permanent primary action; the addon never
+  remembers or silently defaults to an all-tabs deposit.
+- Added current-tab and all-configured-tabs item and deposit counts directly
+  to the compact organizer.
+- Added clear feedback when the open tab has no matching items but another
+  configured tab does.
+- Corrected current-tab progress, opening messages, timelines, and reports so
+  they exclude items and moves assigned to unselected tabs.
+- Replaced both scope actions with one clear **Stop** control while an organizer
+  operation is active.
+
+## 1.2.0-beta.1 - 2026-08-12
+
+- Replaced the small Smart Deposit exception list with a generated profession
+  catalog derived from the MoP Classic item, profession, reagent, created-item,
+  and specialized-bag client data.
+- Fixed Shadow Pigment, Misty Pigment, Ink of Dreams, Starlight Ink, and the
+  full generated set of Inscription pigments, inks, scrolls, and supplies.
+- Added public Engineering, Tailoring, Leatherworking, First Aid, Archaeology,
+  and Shared Profession Supplies categories.
+- Added deterministic coverage for profession recipes and non-equipment
+  products while preserving Armor, Weapons, Cloth, Ore, Leather, Herbs, and
+  Elemental as their own categories.
+- Added a neutral category for genuinely multi-profession materials so one bag
+  item cannot overlap several tab routes.
+- Added Archaeology's 13 bankable keystone items; Archaeology fragment
+  currencies remain outside Smart Deposit because they are not bag items.
+- Added a conservative specialized-bag fallback for future unknown item IDs.
+- Added a reproducible coverage report: 8,576 statically bank-eligible MoP
+  profession candidates categorized, with zero uncovered records.
+- Added regression coverage for Shadow Pigment, Ink of Dreams, Engineering
+  parts and schematics, First Aid bandages, Archaeology keystones, shared
+  supplies, generated coverage, and live bag-family reads.
+- Expanded the Smart Deposit setup panel to fit the new categories cleanly.
+
 ## 1.1.1 - 2026-08-11
 
 - Fixed Smart Deposit expansion filtering on MoP Classic clients that report

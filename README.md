@@ -74,33 +74,73 @@ into guild-bank tabs:
 2. Use the currently selected bank tab, or load another destination tab.
 3. Select every category that belongs there, such as Cloth and Enchanting.
 4. Choose **All** expansions, or select Classic/TBC/Wrath/Cata/Mists.
-5. Enable and save the profile, then click **Scan Bags Now** for a preview.
+5. Enable the profile, then click **Scan Bags Now** for a preview.
+
+Valid changes save automatically. Checkboxes save as soon as they are toggled;
+the profile name and exact item-ID field save on Enter or when keyboard focus
+leaves the field. The editor also saves before **Scan Bags Now**, **Load Tab**,
+**Use Current**, **Back to Organizer**, or closing the page. **Save Now** is an
+optional explicit confirmation and uses the same validation. Invalid edits stay
+visible with an explanation and never replace the last valid saved profile.
+Exact item IDs must be positive whole numbers separated by commas, whitespace,
+or both. Profile controls are temporarily locked during an active Smart Deposit
+scan or move queue so its routing cannot change in flight; editing becomes
+available again when the operation finishes or is stopped. Saved profiles are
+stored per guild and survive logout and `/reload`.
 
 Each purchased tab can have its own profile, and each profile can accept
 multiple categories. The same category may be routed to different tabs when
-their expansion filters do not overlap. Optional exact item IDs handle unusual
+their expansion filters differ. Optional exact item IDs handle unusual
 lockboxes or crafted items whose profession is not present in item metadata.
+Routing always chooses the most specific match: an exact item ID beats a
+category route, and a specific-expansion category route beats an **All
+Expansions** fallback. If two tabs have equally specific legacy routes, the
+conflict names both tabs and the affected item stays in the player's bags;
+unrelated items can still be deposited.
 When matching items are found, the compact panel shows the item and deposit
-counts and enables **Smart Deposit**.
+counts for two explicit choices:
+
+- **Deposit This Tab** moves only items assigned to the guild-bank tab you are
+  currently viewing. This is always the primary action.
+- **Deposit All Tabs** routes eligible bag items to every enabled tab profile.
+  It is always a separate choice and is never remembered as a default.
+
+If the open tab has no matching items but another configured tab does, the
+current-tab action remains disabled while the all-tabs action shows the full
+available count. The addon never redirects one action into the other.
 
 Deposits use a separate confirmation-driven queue and are not held to the
 1.25-second intra-bank sorting cadence. The queue waits 150 ms after each
 confirmed deposit before issuing another command. If the server silently
 rejects one command, the addon refreshes both endpoints and retries once only
 when the bag source and bank destination are provably unchanged. Nothing moves
-until the player clicks **Smart Deposit**.
+until the player clicks one of the two explicit deposit actions.
 
 Category rules are based on the client item class, subclass, equipment slot,
-source-backed item era, or an explicit item-ID list. MoP Classic can report
+profession recipe graph, specialized-bag metadata, source-backed item era, or
+an explicit item-ID list. MoP Classic can report
 the unusable expansion value `254`; GBO resolves the era from Blizzard client
 item data bundled as compact correction ranges. Hover a category in setup to
-see the exact rule. The client combines raw fish, meat, and other cooking ingredients
-in one Trade Goods subclass, so that public category is intentionally named
-**Fish & Raw Cooking**. Known metadata exceptions are curated by item ID; for
-example, Spinefish is included even though WoW exposes it as an
-Alchemy-oriented reagent rather than ordinary Cooking material. It also does
-not expose a universal “crafted by
-Blacksmithing” field, so non-armor Blacksmithing items use exact item IDs.
+see the exact rule. The generated MoP profession catalog covers pigments,
+inks, Engineering parts, profession recipes, bandages, oils, dyes, and other
+objects that the game's broad item class cannot identify reliably. A small,
+reviewed set of materials with several defensible owners uses **Shared Crafting
+Reagents**, avoiding overlapping tab routes. Obvious parchment, vellum, dyes,
+vials, and similar supplies instead use their intuitive profession category.
+The client combines raw fish,
+meat, and other cooking ingredients, so that public category is intentionally
+named **Fish & Cooking**. Armor, Weapons, Cloth, Ore, Leather, Herbs, and
+Elemental materials keep their intrinsic categories even when a profession
+creates or consumes them.
+
+Archaeology profiles cover its bankable keystone items. Archaeology fragments
+are currencies rather than bag items, so there is nothing for Smart Deposit to
+move for those currencies.
+
+The generated audit currently gives every statically bank-eligible item in its
+MoP profession universe one organizational category. See
+[`docs/PROFESSION_COVERAGE.md`](docs/PROFESSION_COVERAGE.md) for the exact
+counts, sources, limitations, shared-item list, and reproduction command.
 
 If a scan finds no deposits, the setup status explains whether the profile is
 paused, an expansion filter excluded matching items, matching items are bound
@@ -113,6 +153,8 @@ Click **Settings** for:
 
 - automatic-open and reverse-direction settings;
 - sort-cadence configuration;
+- a searchable **Category Reference** with definitions, examples, exact
+  numeric item-ID lookup, and the complete Shared Crafting Reagents list;
 - read-only scanning;
 - movement diagnostics;
 - copyable operation reports.
@@ -182,6 +224,7 @@ for file in GuildBankOrganizer/*.lua tests/*.lua; do
   npx --yes luaparse "$file" >/dev/null
 done
 npx --yes --package=fengari-node-cli fengari tests/smoke.lua
+python3 scripts/generate_profession_data.py
 ```
 
 Build a release:

@@ -44,6 +44,83 @@ local function expectedReady()
     return true, nil, source, target
 end
 
+local function sortedKeys(value)
+    local keys = {}
+    for key in pairs(value) do
+        table.insert(keys, key)
+    end
+    table.sort(keys, function(left, right)
+        local leftText = type(left) .. ":" .. tostring(left)
+        local rightText = type(right) .. ":" .. tostring(right)
+        return leftText < rightText
+    end)
+    return keys
+end
+
+local function quoteRecoveryString(value)
+    local escaped = string.gsub(value, "\\", "\\\\")
+    escaped = string.gsub(escaped, '"', '\\"')
+    escaped = string.gsub(escaped, "\n", "\\n")
+    escaped = string.gsub(escaped, "\r", "\\r")
+    escaped = string.gsub(escaped, "\t", "\\t")
+    escaped = string.gsub(escaped, "%c", function(character)
+        return string.format("\\%03d", string.byte(character))
+    end)
+    return '"' .. escaped .. '"'
+end
+
+local function formatRecoveryValue(value, depth, visited)
+    if type(value) == "string" then
+        return quoteRecoveryString(value)
+    elseif type(value) ~= "table" then
+        return tostring(value)
+    elseif visited[value] then
+        return "<cycle>"
+    elseif depth >= 4 then
+        return "<nested table>"
+    end
+
+    visited[value] = true
+    local fields = {}
+    for _, key in ipairs(sortedKeys(value)) do
+        table.insert(fields, string.format(
+            "[%s]=%s",
+            formatRecoveryValue(key, depth + 1, visited),
+            formatRecoveryValue(value[key], depth + 1, visited)
+        ))
+    end
+    visited[value] = nil
+    return "{" .. table.concat(fields, ",") .. "}"
+end
+
+local function appendProfileRecovery(lines)
+    local recovery = GBO:GetDepositProfileRecovery()
+    if not recovery then
+        return
+    end
+
+    table.insert(lines, "profileRecovery:")
+    for _, guildKey in ipairs(sortedKeys(recovery)) do
+        local guildRecovery = recovery[guildKey]
+        if type(guildRecovery) == "table" then
+            for _, tab in ipairs(sortedKeys(guildRecovery)) do
+                table.insert(lines, string.format(
+                    "guild=%s tab=%s value=%s",
+                    formatRecoveryValue(guildKey, 0, {}),
+                    formatRecoveryValue(tab, 0, {}),
+                    formatRecoveryValue(guildRecovery[tab], 0, {})
+                ))
+            end
+        else
+            table.insert(lines, string.format(
+                "guild=%s value=%s",
+                formatRecoveryValue(guildKey, 0, {}),
+                formatRecoveryValue(guildRecovery, 0, {})
+            ))
+        end
+    end
+end
+
 local function buildReport(ok, reason)
     local client = GBO.client or {}
     local lines = {
@@ -82,6 +159,7 @@ local function buildReport(ok, reason)
     for index = 1, #diagnostic.timeline do
         table.insert(lines, diagnostic.timeline[index])
     end
+    appendProfileRecovery(lines)
 
     return table.concat(lines, "\n"), {
         savedAt = GetServerTime(),

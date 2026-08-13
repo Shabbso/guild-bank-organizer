@@ -22,6 +22,26 @@ local itemDatabase = {
     [72988] = { name = "Windwool Cloth", quality = 1, itemLevel = 1, maxStack = 20, sellPrice = 1, classID = 7, subclassID = 5, expansionID = 254 },
     [500] = { name = "Test Dust", quality = 1, itemLevel = 1, maxStack = 20, sellPrice = 1, classID = 7, subclassID = 12 },
     [74249] = { name = "Spirit Dust", quality = 1, itemLevel = 1, maxStack = 20, sellPrice = 1, classID = 7, subclassID = 12, expansionID = 0 },
+    [79251] = { name = "Shadow Pigment", quality = 1, itemLevel = 86, maxStack = 20, sellPrice = 1, classID = 7, subclassID = 11, bagFamily = 16, expansionID = 254 },
+    [79254] = { name = "Ink of Dreams", quality = 1, itemLevel = 85, maxStack = 20, sellPrice = 1, classID = 7, subclassID = 1, bagFamily = 16, expansionID = 254 },
+    [4359] = { name = "Handful of Copper Bolts", quality = 1, itemLevel = 10, maxStack = 20, sellPrice = 1, classID = 7, subclassID = 1, bagFamily = 128, expansionID = 0 },
+    [2581] = { name = "Heavy Linen Bandage", quality = 1, itemLevel = 20, maxStack = 20, sellPrice = 1, classID = 0, subclassID = 7, expansionID = 0 },
+    [2406] = { name = "Pattern: Fine Leather Boots", quality = 1, itemLevel = 1, maxStack = 1, sellPrice = 1, classID = 9, subclassID = 1, expansionID = 0 },
+    [4408] = { name = "Schematic: Mechanical Squirrel Box", quality = 1, itemLevel = 15, maxStack = 1, sellPrice = 1, classID = 9, subclassID = 3, bagFamily = 128, expansionID = 0 },
+    [4293] = { name = "Pattern: Hillman's Leather Vest", quality = 1, itemLevel = 1, maxStack = 1, sellPrice = 1, classID = 9, subclassID = 1, expansionID = 0 },
+    [4342] = { name = "Purple Dye", quality = 1, itemLevel = 1, maxStack = 20, sellPrice = 1, classID = 7, subclassID = 11, expansionID = 0 },
+    [4357] = { name = "Rough Blasting Powder", quality = 1, itemLevel = 1, maxStack = 20, sellPrice = 1, classID = 7, subclassID = 1, expansionID = 0 },
+    [2447] = { name = "Peacebloom", quality = 1, itemLevel = 1, maxStack = 20, sellPrice = 1, classID = 7, subclassID = 9, expansionID = 0 },
+    [785] = { name = "Mageroyal", quality = 1, itemLevel = 1, maxStack = 20, sellPrice = 1, classID = 7, subclassID = 9, expansionID = 0 },
+    [2604] = { name = "Red Dye", quality = 1, itemLevel = 1, maxStack = 20, sellPrice = 1, classID = 7, subclassID = 11, expansionID = 0 },
+    [3371] = { name = "Crystal Vial", quality = 1, itemLevel = 5, maxStack = 20, sellPrice = 1, classID = 7, subclassID = 11, bagFamily = 16, expansionID = 0 },
+    [37602] = { name = "Ruined Vellum", quality = 1, itemLevel = 1, maxStack = 20, sellPrice = 1, classID = 7, subclassID = 11, expansionID = 2 },
+    [39354] = { name = "Light Parchment", quality = 1, itemLevel = 1, maxStack = 20, sellPrice = 1, classID = 7, subclassID = 11, expansionID = 2 },
+    [52078] = { name = "Chaos Orb", quality = 1, itemLevel = 1, maxStack = 20, sellPrice = 1, classID = 7, subclassID = 11, expansionID = 3 },
+    [23418] = { name = "Test Sapper Charge", quality = 1, itemLevel = 1, maxStack = 20, sellPrice = 1, classID = 7, subclassID = 11, expansionID = 1 },
+    [23572] = { name = "Primal Nether", quality = 1, itemLevel = 1, maxStack = 20, sellPrice = 1, classID = 7, subclassID = 11, expansionID = 1 },
+    [79868] = { name = "Pandaren Pottery Shard", quality = 1, itemLevel = 1, maxStack = 20, sellPrice = 1, classID = 7, subclassID = 11, expansionID = 254 },
+    [72234] = { name = "Green Tea Leaf", quality = 1, itemLevel = 1, maxStack = 20, sellPrice = 1, classID = 7, subclassID = 9, expansionID = 254 },
     [83064] = { name = "Spinefish", quality = 1, itemLevel = 1, maxStack = 20, sellPrice = 1, classID = 7, subclassID = 11 },
     [103641] = { name = "Singing Crystal", quality = 1, itemLevel = 1, maxStack = 20, sellPrice = 1, classID = 0, subclassID = 5 },
     [109999] = { name = "Unclassified Material", quality = 1, itemLevel = 1, maxStack = 20, sellPrice = 1, classID = 7, subclassID = 11 },
@@ -42,6 +62,17 @@ local function makeItem(itemID, count)
         link = itemLink(itemID),
         count = count,
         texture = itemID,
+    }
+end
+
+local function readTestItem(itemID)
+    local info = assert(itemDatabase[itemID], "missing test item " .. itemID)
+    return {
+        itemID = itemID,
+        classID = info.classID,
+        subclassID = info.subclassID,
+        equipLoc = info.equipLoc or "",
+        bagFamily = info.bagFamily or 0,
     }
 end
 
@@ -88,6 +119,16 @@ local function runNextTimer()
     assert(timer, "expected a pending timer")
     currentTime = timer.at
     timer.callback()
+end
+
+local function finishDepositPlanScan()
+    local attempts = 0
+    while addon:IsDepositScanning() do
+        runNextTimer()
+        attempts = attempts + 1
+        assert(attempts < 100, "deposit plan scan did not converge")
+    end
+    addon:RefreshOrganizerUI()
 end
 
 MAX_GUILDBANK_SLOTS_PER_TAB = 98
@@ -141,7 +182,10 @@ local function addWidgetMethods(widget)
     widget.text = ""
     widget.scripts = widget.scripts or {}
 
-    function widget:SetSize() end
+    function widget:SetSize(width, height)
+        self.width = width
+        self.height = height
+    end
     function widget:SetPoint() end
     function widget:SetAllPoints() end
     function widget:SetFrameStrata() end
@@ -151,15 +195,48 @@ local function addWidgetMethods(widget)
     function widget:SetClampedToScreen() end
     function widget:SetAutoFocus() end
     function widget:SetJustifyH() end
-    function widget:ClearFocus() end
+    function widget:ClearFocus()
+        local hadFocus = self.focused
+        self.focused = false
+        if hadFocus and self.scripts.OnEditFocusLost then
+            self.scripts.OnEditFocusLost(self)
+        end
+    end
+    function widget:SetFocus()
+        self.focused = true
+        if self.scripts.OnEditFocusGained then
+            self.scripts.OnEditFocusGained(self)
+        end
+    end
+    function widget:HasFocus()
+        return self.focused and true or false
+    end
     function widget:SetMultiLine() end
     function widget:SetFontObject() end
     function widget:SetNormalFontObject() end
     function widget:SetTextColor() end
-    function widget:SetWidth() end
-    function widget:SetHeight() end
+    function widget:SetWidth(width)
+        self.width = width
+    end
+    function widget:SetHeight(height)
+        self.height = height
+    end
     function widget:SetTexture() end
-    function widget:SetColorTexture() end
+    function widget:SetColorTexture(red, green, blue, alpha)
+        self.color = { red, green, blue, alpha }
+    end
+    function widget:SetBackdrop(backdrop)
+        self.backdrop = backdrop
+    end
+    function widget:SetBackdropColor(red, green, blue, alpha)
+        self.backdropColor = { red, green, blue, alpha }
+    end
+    function widget:SetBackdropBorderColor(red, green, blue, alpha)
+        self.backdropBorderColor = { red, green, blue, alpha }
+    end
+    function widget:IsMouseOver()
+        return self.mouseOver and true or false
+    end
     function widget:SetMinMaxValues(minimum, maximum)
         self.minimum = minimum
         self.maximum = maximum
@@ -172,10 +249,16 @@ local function addWidgetMethods(widget)
     function widget:SetCursorPosition() end
     function widget:SetScrollChild() end
     function widget:UpdateScrollChildRect() end
+    function widget:SetVerticalScroll(offset)
+        self.verticalScroll = offset
+    end
     function widget:StartMoving() end
     function widget:StopMovingOrSizing() end
     function widget:Enable()
         self.enabled = true
+        if self.scripts.OnEnable then
+            self.scripts.OnEnable(self)
+        end
     end
     function widget:Disable()
         self.enabled = false
@@ -198,6 +281,20 @@ local function addWidgetMethods(widget)
     function widget:GetNumLines()
         local _, newlines = string.gsub(self.text, "\n", "\n")
         return newlines + 1
+    end
+    function widget:GetStringHeight()
+        local charactersPerLine = math.max(
+            1,
+            math.floor((self.width or 300) / 7)
+        )
+        local lineCount = 0
+        for line in string.gmatch(self.text .. "\n", "(.-)\n") do
+            lineCount = lineCount + math.max(
+                1,
+                math.ceil(string.len(line) / charactersPerLine)
+            )
+        end
+        return lineCount * 14
     end
     function widget:SetScript(script, callback)
         self.scripts[script] = callback
@@ -432,6 +529,14 @@ end
 
 C_Item = {
     GetItemInfo = GetItemInfo,
+    GetItemFamily = function(item)
+        local itemID = tonumber(item)
+        if not itemID and type(item) == "string" then
+            itemID = tonumber(string.match(item, "item:(%d+)"))
+        end
+        local info = itemDatabase[itemID]
+        return info and info.bagFamily or 0
+    end,
     GetItemInfoInstant = function(item)
         local itemID = tonumber(item)
         if not itemID and type(item) == "string" then
@@ -512,7 +617,10 @@ end
 
 loadAddonFile("GuildBankOrganizer/Core.lua")
 loadAddonFile("GuildBankOrganizer/ExpansionData.lua")
+loadAddonFile("GuildBankOrganizer/ProfessionData.lua")
 loadAddonFile("GuildBankOrganizer/Categories.lua")
+loadAddonFile("GuildBankOrganizer/ProfileStore.lua")
+loadAddonFile("GuildBankOrganizer/CategoryReference.lua")
 loadAddonFile("GuildBankOrganizer/Scanner.lua")
 loadAddonFile("GuildBankOrganizer/Diagnostics.lua")
 loadAddonFile("GuildBankOrganizer/Sorter.lua")
@@ -521,11 +629,135 @@ loadAddonFile("GuildBankOrganizer/UI.lua")
 loadAddonFile("GuildBankOrganizer/Commands.lua")
 
 assert(type(addon.ShowTestUI) == "function")
+local categorySections = addon:GetCategoryReferenceSections()
+local herbsSection
+local sharedSection
+for index, section in ipairs(categorySections) do
+    if index > 1 then
+        assert(categorySections[index - 1].name <= section.name)
+    end
+    if section.key == "herbs" then
+        herbsSection = section
+    elseif section.key == "profession_supplies" then
+        sharedSection = section
+    end
+end
+assert(herbsSection and #herbsSection.examples > 0)
+assert(sharedSection and sharedSection.name == "Shared Crafting Reagents")
+local originalHerbExample = herbsSection.examples[1]
+herbsSection.examples[1] = "mutated by reference caller"
+local freshHerbsSection
+for _, section in ipairs(addon:GetCategoryReferenceSections()) do
+    if section.key == "herbs" then
+        freshHerbsSection = section
+    end
+end
+assert(freshHerbsSection.examples[1] == originalHerbExample)
+
+local getItemInfoBeforeColdSearch = GetItemInfo
+local cItemGetItemInfoBeforeColdSearch = C_Item.GetItemInfo
+GetItemInfo = function()
+    error("category reference search must not use the live item cache")
+end
+C_Item.GetItemInfo = GetItemInfo
+local coldVialResults = addon:SearchProfessionReference("vial", 50)
+local formattedColdVial
+for _, record in ipairs(coldVialResults) do
+    assert(record.name ~= "Test Sapper Charge")
+    if record.itemID == 3371 then
+        formattedColdVial = addon:FormatCategoryReferenceResult(record)
+    end
+end
+assert(formattedColdVial)
+assert(formattedColdVial.name == "Crystal Vial")
+assert(formattedColdVial.categoryName == "Alchemy")
+assert(formattedColdVial.expansionName == "Classic")
+assert(formattedColdVial.evidence == "curated player-facing category")
+GetItemInfo = getItemInfoBeforeColdSearch
+C_Item.GetItemInfo = cItemGetItemInfoBeforeColdSearch
+
+local formattedExcluded = addon:FormatCategoryReferenceResult(
+    addon:SearchProfessionReference("23418", 50)[1]
+)
+assert(formattedExcluded.name == "Test Sapper Charge")
+assert(formattedExcluded.status == "excluded")
+assert(string.find(formattedExcluded.statusText, "internal test item", 1, true))
+assert(#addon:SearchProfessionReference("Test Sapper Charge", 50) == 0)
+local crashItemReference = assert(addon:GetProfessionReferenceItem(47842))
+assert(crashItemReference.status == "excluded")
+assert(crashItemReference.evidence == "programmer-only crash item")
+assert(addon:SearchProfessionReference("47842", 50)[1] == crashItemReference)
+assert(#addon:SearchProfessionReference("SERVER CRASHING ITEM", 50) == 0)
+for _, itemID in ipairs({ 23364, 27774, 56478 }) do
+    local record = assert(addon:GetProfessionReferenceItem(itemID))
+    assert(record.status == "excluded")
+    assert(addon:SearchProfessionReference(tostring(itemID), 50)[1] == record)
+    assert(#addon:SearchProfessionReference(record.name, 50) == 0)
+end
+for _, itemID in ipairs({ 3172, 4366, 23767, 34626 }) do
+    assert(addon:GetProfessionReferenceItem(itemID).status == "public")
+end
+local unsupportedReference = addon:FormatCategoryReferenceResult({
+    itemID = 999999,
+    name = "Unknown",
+})
+assert(unsupportedReference.status == "unsupported")
+assert(
+    unsupportedReference.statusText
+        == "No bundled MoP Classic profession item found."
+)
+
+local expectedSharedIDs = {
+    4402, 5635, 5637, 12811, 23572, 30183, 32428, 34664, 43102,
+    45087, 47556, 49908, 52078, 69237, 71998, 80433, 83092, 94289,
+    102218,
+}
+local sharedReferenceResults = addon:GetSharedCraftingReagents()
+assert(#sharedReferenceResults == #expectedSharedIDs)
+for index, record in ipairs(sharedReferenceResults) do
+    assert(record.itemID == expectedSharedIDs[index])
+    local formatted = addon:FormatCategoryReferenceResult(record)
+    assert(formatted.categoryName == "Shared Crafting Reagents")
+    assert(formatted.expansionID >= 0 and formatted.expansionID <= 4)
+    assert(type(formatted.expansionName) == "string")
+end
 assert(addon:ClassifyDepositItem({
     itemID = 72988,
     classID = 7,
     subclassID = 5,
 }) == "cloth")
+assert(select(1, addon:ClassifyDepositItem(readTestItem(3371))) == "alchemy")
+assert(select(1, addon:ClassifyDepositItem(readTestItem(2604))) == "tailoring")
+assert(select(1, addon:ClassifyDepositItem(readTestItem(39354))) == "inscription")
+assert(select(1, addon:ClassifyDepositItem(readTestItem(37602))) == "enchanting")
+assert(select(1, addon:ClassifyDepositItem(readTestItem(52078))) == "profession_supplies")
+assert(select(1, addon:ClassifyDepositItem(readTestItem(23572))) == "profession_supplies")
+assert(select(1, addon:ClassifyDepositItem(readTestItem(23418))) == nil)
+assert(addon:GetDepositCategoryName("profession_supplies") == "Shared Crafting Reagents")
+
+local vialReference = assert(addon:DescribeProfessionReference(3371))
+assert(vialReference.name == "Crystal Vial")
+assert(vialReference.categoryKey == "alchemy")
+assert(vialReference.expansionName == "Classic")
+local generatedVialReference = addon:GetProfessionReferenceItem(3371)
+assert(generatedVialReference.expansionName == nil)
+assert(generatedVialReference.exactTabs == nil)
+local excludedReference = assert(addon:DescribeProfessionReference(23418))
+assert(excludedReference.status == "excluded")
+local spinefishReference = assert(addon:DescribeProfessionReference(83064))
+assert(select(1, addon:ClassifyDepositItem(readTestItem(83064))) == "fish")
+assert(spinefishReference.categoryKey == "fish")
+assert(spinefishReference.evidence == "curated gameplay item ID")
+local shared = addon:GetSharedCraftingReagents()
+assert(#shared == 19)
+for _, itemID in ipairs({
+    785, 3371, 2604, 39354, 37602, 52078, 23572, 23418, 83064, 79254,
+}) do
+    assert(
+        select(1, addon:ClassifyDepositItem(readTestItem(itemID)))
+            == addon:DescribeProfessionReference(itemID).categoryKey
+    )
+end
 assert(addon:ClassifyDepositItem({
     itemID = 999,
     classID = 4,
@@ -543,7 +775,7 @@ local spinefishCategory, spinefishEvidence = addon:ClassifyDepositItem({
     subclassID = 11,
 })
 assert(spinefishCategory == "fish")
-assert(spinefishEvidence == "curated item ID")
+assert(spinefishEvidence == "curated gameplay item ID")
 assert(addon:ClassifyDepositItem({
     itemID = 103641,
     classID = 0,
@@ -555,7 +787,90 @@ local vellumCategory, vellumEvidence = addon:ClassifyDepositItem({
     subclassID = 14,
 })
 assert(vellumCategory == "enchanting")
-assert(vellumEvidence == "curated item ID")
+assert(vellumEvidence == "curated gameplay item ID")
+local pigmentCategory, pigmentEvidence = addon:ClassifyDepositItem({
+    itemID = 79251,
+    classID = 7,
+    subclassID = 11,
+    bagFamily = 16,
+})
+assert(pigmentCategory == "inscription")
+assert(pigmentEvidence == "MoP profession item data")
+local inkCategory = addon:ClassifyDepositItem(readTestItem(79254))
+assert(inkCategory == "inscription")
+assert(addon:DescribeProfessionReference(79254).categoryKey == inkCategory)
+assert(addon:ClassifyDepositItem(readTestItem(4357)) == "engineering")
+assert(addon:ClassifyDepositItem(readTestItem(4342)) == "tailoring")
+assert(addon:ClassifyDepositItem(readTestItem(2406)) == "leatherworking")
+assert(addon:ClassifyDepositItem(readTestItem(4293)) == "leatherworking")
+local boltsCategory = addon:ClassifyDepositItem({
+    itemID = 4359,
+    classID = 7,
+    subclassID = 1,
+    bagFamily = 128,
+})
+assert(boltsCategory == "engineering")
+assert(addon:ClassifyDepositItem({
+    itemID = 2581,
+    classID = 0,
+    subclassID = 7,
+}) == "first_aid")
+assert(addon:ClassifyDepositItem({
+    itemID = 4408,
+    classID = 9,
+    subclassID = 3,
+    bagFamily = 128,
+}) == "engineering")
+assert(addon:ClassifyDepositItem({
+    itemID = 3371,
+    classID = 7,
+    subclassID = 11,
+    bagFamily = 16,
+}) == "alchemy")
+assert(addon:ClassifyDepositItem({
+    itemID = 79868,
+    classID = 7,
+    subclassID = 11,
+}) == "archaeology")
+local professionCoverage = addon:GetProfessionCoverageSummary()
+assert(professionCoverage.sourceBuild == "5.5.4.68806")
+assert(professionCoverage.eligibleItems > 8000)
+assert(professionCoverage.generatedItems > 600)
+assert(professionCoverage.unclassifiedItems == 0)
+bags[0][16] = makeItem(79251, 2)
+local shadowPigmentSlot = addon:ReadDepositBagSlot(0, 16)
+assert(shadowPigmentSlot.bagFamily == 16)
+assert(shadowPigmentSlot.categoryKey == "inscription")
+assert(shadowPigmentSlot.categoryEvidence == "MoP profession item data")
+bags[0][16] = nil
+local futurePigmentCategory, futurePigmentEvidence = addon:ClassifyDepositItem({
+    itemID = 999999,
+    classID = 7,
+    subclassID = 11,
+    bagFamily = 16,
+})
+assert(futurePigmentCategory == "inscription")
+assert(futurePigmentEvidence == "specialized bag family")
+assert(addon:ClassifyDepositItem({
+    itemID = 999998,
+    classID = 1,
+    subclassID = 0,
+    bagFamily = 16,
+}) == "bags")
+assert(addon:ClassifyDepositItem({
+    itemID = 999997,
+    classID = 4,
+    subclassID = 1,
+    bagFamily = 128,
+}) == "armor")
+assert(addon:GetGeneratedProfessionCategory(72988) == nil)
+assert(addon:GetGeneratedProfessionCategory(9210) == "tailoring")
+for _, itemID in ipairs({ 1165, 8547, 40677, 67435 }) do
+    local record = addon:GetProfessionReferenceItem(itemID)
+    assert(record.status == "excluded")
+    assert(addon:SearchProfessionReference(tostring(itemID))[1] == record)
+    assert(#addon:SearchProfessionReference(record.name) == 0)
+end
 local spiritDustExpansion, spiritDustEvidence =
     addon:ResolveDepositExpansion(74249, 0, Enum.ItemClass.Tradegoods)
 assert(spiritDustExpansion == 4)
@@ -594,11 +909,221 @@ local wrathGlyphExpansion =
 assert(wrathGlyphExpansion == 2)
 
 GuildBankOrganizerDB = {
-    schema = 4,
+    schema = 5,
     settings = {},
     runs = {},
+    depositProfiles = "first malformed top-level profile container",
+}
+addon:InitializeDatabase()
+assert(type(GuildBankOrganizerDB.depositProfiles) == "table")
+local topLevelRecovery = assert(addon:GetDepositProfileRecovery())
+assert(
+    topLevelRecovery.__depositProfilesContainer
+        == "first malformed top-level profile container"
+)
+local firstTopLevelRecovery = topLevelRecovery.__depositProfilesContainer
+GuildBankOrganizerDB.depositProfiles = false
+addon:InitializeDatabase()
+assert(type(GuildBankOrganizerDB.depositProfiles) == "table")
+assert(
+    addon:GetDepositProfileRecovery().__depositProfilesContainer
+        == firstTopLevelRecovery
+)
+
+GuildBankOrganizerDB = {
+    schema = 5,
+    settings = {},
+    runs = {},
+    depositProfileRecovery = topLevelRecovery,
     depositProfiles = {
         ["Test Realm\031Test Guild"] = {
+            [1] = {
+                enabled = true,
+                label = "Shared supplies",
+                categories = { profession_supplies = true },
+                allExpansions = true,
+                expansions = {},
+                exactItemIDs = { [3371] = true },
+                enabledStateVersion = 1,
+            },
+            [2] = {
+                enabled = "yes",
+                label = {},
+                categories = "not a table",
+                allExpansions = false,
+                expansions = "not a table",
+                exactItemIDs = { [-1] = true },
+                unexpected = true,
+            },
+            [3] = {
+                enabled = false,
+                label = "Disabled exact profile",
+                categories = {},
+                allExpansions = true,
+                expansions = {},
+                exactItemIDs = { [3371] = true },
+                enabledStateVersion = 1,
+            },
+            [4] = {
+                enabled = true,
+                label = "Unknown category",
+                categories = { removed_category = true },
+                allExpansions = true,
+                expansions = {},
+                exactItemIDs = {},
+                enabledStateVersion = 1,
+            },
+            [5] = "not a profile table",
+        },
+    },
+}
+local getNumGuildBankTabs = GetNumGuildBankTabs
+GetNumGuildBankTabs = function()
+    error("migration must not inspect open guild-bank tabs")
+end
+fire("ADDON_LOADED", addonName)
+GetNumGuildBankTabs = getNumGuildBankTabs
+assert(GuildBankOrganizerDB.schema == 6)
+assert(addon:GetDepositProfile(1, false).categories.profession_supplies)
+assert(addon:GetDepositProfile(1, false).enabled)
+assert(not addon:GetDepositProfile(2, false).enabled)
+local profileRecovery = assert(addon:GetDepositProfileRecovery())
+assert(profileRecovery["Test Realm\031Test Guild"][2].unexpected)
+assert(profileRecovery["Test Realm\031Test Guild"][4].categories.removed_category)
+assert(not addon:GetDepositProfile(4, false).enabled)
+assert(profileRecovery["Test Realm\031Test Guild"][5] == "not a profile table")
+assert(not addon:GetDepositProfile(5, false).enabled)
+local exactTabs = addon:GetExactDepositProfileTabs(3371)
+assert(#exactTabs == 1 and exactTabs[1] == 1)
+local exactVialReference = assert(addon:DescribeProfessionReference(3371))
+assert(#exactVialReference.exactTabs == 1 and exactVialReference.exactTabs[1] == 1)
+local formattedExactVial = addon:FormatCategoryReferenceResult(exactVialReference)
+assert(formattedExactVial.categoryName == "Alchemy")
+assert(#formattedExactVial.exactTabs == 1 and formattedExactVial.exactTabs[1] == 1)
+assert(string.find(formattedExactVial.exactRouteText, "Tab 1", 1, true))
+assert(string.find(formattedExactVial.exactRouteText, "Shared supplies", 1, true))
+
+local validDraft = {
+    enabled = true,
+    label = "  Classic Herbs  ",
+    categories = { herbs = true },
+    allExpansions = false,
+    expansions = { [0] = true },
+    exactItemIDs = { ["3371"] = true },
+}
+local draftSaved, normalizedDraft = addon:SaveDepositProfileDraft(1, validDraft)
+assert(draftSaved)
+assert(normalizedDraft.label == "Classic Herbs")
+assert(normalizedDraft.exactItemIDs[3371])
+assert(validDraft.label == "  Classic Herbs  ")
+assert(validDraft.exactItemIDs["3371"])
+assert(not addon:ValidateDepositProfile(0, validDraft))
+local unknownDraft, unknownReason = addon:ValidateDepositProfile(1, {
+    enabled = false,
+    label = "Unknown",
+    categories = { removed_category = true },
+    allExpansions = true,
+    expansions = {},
+    exactItemIDs = {},
+})
+assert(not unknownDraft)
+assert(string.find(unknownReason, "removed_category", 1, true))
+local invalidItemDraft, invalidItemReason = addon:ValidateDepositProfile(1, {
+    enabled = false,
+    label = "Invalid ID",
+    categories = {},
+    allExpansions = true,
+    expansions = {},
+    exactItemIDs = { [-1] = true },
+})
+assert(not invalidItemDraft)
+assert(string.find(invalidItemReason, "positive", 1, true))
+local disabledDraft = assert(addon:ValidateDepositProfile(1, {
+    enabled = false,
+    label = "  Later  ",
+    categories = {},
+    allExpansions = false,
+    expansions = {},
+    exactItemIDs = {},
+}))
+assert(not disabledDraft.enabled)
+assert(disabledDraft.label == "Later")
+assert(not disabledDraft.allExpansions)
+assert(not next(disabledDraft.categories))
+assert(not next(disabledDraft.expansions))
+assert(not next(disabledDraft.exactItemIDs))
+local savedDraft = addon:GetDepositProfile(1, false)
+local invalidSaved, invalidReason = addon:SaveDepositProfileDraft(1, {
+    enabled = true,
+    label = "Invalid replacement",
+    categories = { herbs = true },
+    allExpansions = false,
+    expansions = {},
+    exactItemIDs = {},
+})
+assert(not invalidSaved)
+assert(string.find(invalidReason, "expansion", 1, true))
+assert(addon:GetDepositProfile(1, false) == savedDraft)
+assert(savedDraft.enabled)
+assert(savedDraft.label == "Classic Herbs")
+assert(savedDraft.categories.herbs)
+assert(not savedDraft.allExpansions)
+assert(savedDraft.expansions[0])
+assert(savedDraft.exactItemIDs[3371])
+
+addon.db = nil
+GetNumGuildBankTabs = function()
+    error("reload migration must not inspect open guild-bank tabs")
+end
+addon:InitializeDatabase()
+GetNumGuildBankTabs = getNumGuildBankTabs
+local reloadedDraft = addon:GetDepositProfile(1, false)
+assert(reloadedDraft.enabled)
+assert(reloadedDraft.label == "Classic Herbs")
+assert(reloadedDraft.categories.herbs)
+assert(not reloadedDraft.allExpansions)
+assert(reloadedDraft.expansions[0])
+assert(reloadedDraft.exactItemIDs[3371])
+
+local firstRecovery = addon:GetDepositProfileRecovery()["Test Realm\031Test Guild"][2]
+GuildBankOrganizerDB.depositProfiles["Test Realm\031Test Guild"][2] = {
+    enabled = "still malformed",
+    categories = {},
+    allExpansions = true,
+    expansions = {},
+    exactItemIDs = {},
+}
+addon:MigrateDepositProfileDatabase(GuildBankOrganizerDB, 5)
+assert(addon:GetDepositProfileRecovery()["Test Realm\031Test Guild"][2] == firstRecovery)
+assert(not addon:GetDepositProfile(2, false).enabled)
+
+local malformedGuildDatabase = {
+    depositProfiles = {
+        ["Test Realm\031Test Guild"] = "first malformed guild container",
+    },
+}
+addon:MigrateDepositProfileDatabase(malformedGuildDatabase, 5)
+assert(type(malformedGuildDatabase.depositProfiles["Test Realm\031Test Guild"]) == "table")
+assert(
+    malformedGuildDatabase.depositProfileRecovery["Test Realm\031Test Guild"]
+        .__guildProfileContainer == "first malformed guild container"
+)
+local initializedDatabase = addon.db
+addon.db = malformedGuildDatabase
+assert(type(addon:GetDepositProfiles(false)) == "table")
+assert(addon:GetDepositProfile(1, false) == nil)
+addon.db = initializedDatabase
+malformedGuildDatabase.depositProfiles["Test Realm\031Test Guild"] = false
+addon:MigrateDepositProfileDatabase(malformedGuildDatabase, 5)
+assert(type(malformedGuildDatabase.depositProfiles["Test Realm\031Test Guild"]) == "table")
+assert(
+    malformedGuildDatabase.depositProfileRecovery["Test Realm\031Test Guild"]
+        .__guildProfileContainer == "first malformed guild container"
+)
+
+local legacyDatabase = {
+    depositProfiles = {
+        ["Legacy Realm\031Legacy Guild"] = {
             [2] = {
                 enabled = false,
                 label = "Affected beta profile",
@@ -610,17 +1135,190 @@ GuildBankOrganizerDB = {
         },
     },
 }
-fire("ADDON_LOADED", addonName)
-assert(GuildBankOrganizerDB.schema == 5)
-assert(addon:GetDepositProfile(2, false).enabled)
+addon:MigrateDepositProfileDatabase(legacyDatabase, 4)
+assert(legacyDatabase.depositProfiles["Legacy Realm\031Legacy Guild"][2].enabled)
+assert(legacyDatabase.depositProfiles["Legacy Realm\031Legacy Guild"][2].enabledStateVersion == 1)
 addon:GetDepositProfiles(false)[2] = nil
 fire("PLAYER_LOGIN")
 fire("GUILDBANKFRAME_OPENED")
 
 assert(GuildBankOrganizerFrame:IsShown())
+assert(GuildBankOrganizerFrame.DepositCurrentButton:GetText() == "Deposit This Tab")
+assert(GuildBankOrganizerFrame.DepositAllButton:GetText() == "Deposit All Tabs")
+assert(not GuildBankOrganizerFrame.DepositStopButton:IsShown())
 addon:ShowTestUI()
+assert(GuildBankOrganizerAdvancedFrame:IsShown())
+assert(string.find(
+    GuildBankOrganizerAdvancedFrame.RecoveryText:GetText(),
+    "Recovered Smart Deposit data",
+    1,
+    true
+))
+GuildBankOrganizerAdvancedFrame.CategoryReferenceButton.scripts.OnClick()
+assert(GuildBankOrganizerCategoryReferenceFrame:IsShown())
+assert(not GuildBankOrganizerAdvancedFrame:IsShown())
+assert(GuildBankOrganizerCategoryReferenceFrame.SearchInput)
+assert(GuildBankOrganizerCategoryReferenceFrame.SearchButton)
+assert(GuildBankOrganizerCategoryReferenceFrame.CategoryList)
+assert(GuildBankOrganizerCategoryReferenceFrame.ResultList)
+assert(GuildBankOrganizerCategoryReferenceFrame.SharedButton)
+assert(GuildBankOrganizerCategoryReferenceFrame.BackButton)
+assert(
+    GuildBankOrganizerCategoryReferenceFrame.CategoryList.height
+        >= GuildBankOrganizerCategoryReferenceFrame.CategoryList.Text:GetStringHeight()
+            + 8
+)
+
+GuildBankOrganizerCategoryReferenceFrame.SearchInput:SetText("vial")
+GuildBankOrganizerCategoryReferenceFrame.ResultList.Scroll:SetVerticalScroll(123)
+GuildBankOrganizerCategoryReferenceFrame.SearchButton.scripts.OnClick()
+assert(
+    GuildBankOrganizerCategoryReferenceFrame.ResultList.Scroll.verticalScroll
+        == 0
+)
+local sawCrystalVial = false
+for _, result in ipairs(
+    GuildBankOrganizerCategoryReferenceFrame.ResultList.Results
+) do
+    if result.itemID == 3371 then
+        sawCrystalVial = true
+    end
+    assert(result.name ~= "Test Sapper Charge")
+end
+assert(sawCrystalVial)
+assert(string.find(
+    GuildBankOrganizerCategoryReferenceFrame.ResultList.Text:GetText(),
+    "Classic Herbs",
+    1,
+    true
+))
+
+GuildBankOrganizerCategoryReferenceFrame.BackButton.scripts.OnClick()
+assert(addon:SaveDepositProfileDraft(1, {
+    enabled = true,
+    label = "Renamed Vial Destination",
+    categories = { herbs = true },
+    allExpansions = false,
+    expansions = { [0] = true },
+    exactItemIDs = { [3371] = true },
+}))
+finishDepositPlanScan()
+GuildBankOrganizerAdvancedFrame.CategoryReferenceButton.scripts.OnClick()
+assert(string.find(
+    GuildBankOrganizerCategoryReferenceFrame.ResultList.Text:GetText(),
+    "Renamed Vial Destination",
+    1,
+    true
+))
+GuildBankOrganizerCategoryReferenceFrame.BackButton.scripts.OnClick()
+assert(addon:SaveDepositProfileDraft(1, {
+    enabled = true,
+    label = "Classic Herbs",
+    categories = { herbs = true },
+    allExpansions = false,
+    expansions = { [0] = true },
+    exactItemIDs = {},
+}))
+finishDepositPlanScan()
+GuildBankOrganizerAdvancedFrame.CategoryReferenceButton.scripts.OnClick()
+assert(not string.find(
+    GuildBankOrganizerCategoryReferenceFrame.ResultList.Text:GetText(),
+    "Custom exact-ID destination",
+    1,
+    true
+))
+GuildBankOrganizerCategoryReferenceFrame.BackButton.scripts.OnClick()
+assert(addon:SaveDepositProfileDraft(1, {
+    enabled = true,
+    label = "Classic Herbs",
+    categories = { herbs = true },
+    allExpansions = false,
+    expansions = { [0] = true },
+    exactItemIDs = { [3371] = true },
+}))
+finishDepositPlanScan()
+GuildBankOrganizerAdvancedFrame.CategoryReferenceButton.scripts.OnClick()
+
+GuildBankOrganizerCategoryReferenceFrame.SearchInput:SetText("23418")
+GuildBankOrganizerCategoryReferenceFrame.SearchButton.scripts.OnClick()
+assert(string.find(
+    GuildBankOrganizerCategoryReferenceFrame.ResultList.Text:GetText(),
+    "Excluded: internal test item",
+    1,
+    true
+))
+GuildBankOrganizerCategoryReferenceFrame.SearchInput:SetText("999999")
+GuildBankOrganizerCategoryReferenceFrame.SearchButton.scripts.OnClick()
+assert(
+    GuildBankOrganizerCategoryReferenceFrame.ResultList.Text:GetText()
+        == "No bundled MoP Classic profession item found."
+)
+
+GuildBankOrganizerCategoryReferenceFrame.ResultList.Scroll:SetVerticalScroll(321)
+GuildBankOrganizerCategoryReferenceFrame.SharedButton.scripts.OnClick()
+assert(
+    GuildBankOrganizerCategoryReferenceFrame.ResultList.Scroll.verticalScroll
+        == 0
+)
+local sharedPageResults = GuildBankOrganizerCategoryReferenceFrame.ResultList.Results
+assert(#sharedPageResults == #expectedSharedIDs)
+assert(
+    GuildBankOrganizerCategoryReferenceFrame.ResultList.height
+        >= GuildBankOrganizerCategoryReferenceFrame.ResultList.Text:GetStringHeight()
+            + 8
+)
+assert(GuildBankOrganizerCategoryReferenceFrame.ResultList.height > 768)
+local priorExpansionID = -1
+for _, result in ipairs(sharedPageResults) do
+    assert(result.expansionID >= priorExpansionID)
+    assert(string.find(result.line, result.expansionName, 1, true))
+    priorExpansionID = result.expansionID
+end
+GuildBankOrganizerCategoryReferenceFrame.BackButton.scripts.OnClick()
+assert(not GuildBankOrganizerCategoryReferenceFrame:IsShown())
+assert(GuildBankOrganizerAdvancedFrame:IsShown())
+assert(addon:SaveDepositProfileDraft(1, {
+    enabled = true,
+    label = "Classic Herbs",
+    categories = { herbs = true },
+    allExpansions = false,
+    expansions = { [0] = true },
+    exactItemIDs = { [3371] = true, [4402] = true },
+}))
+finishDepositPlanScan()
+GuildBankOrganizerAdvancedFrame.CategoryReferenceButton.scripts.OnClick()
+assert(string.find(
+    GuildBankOrganizerCategoryReferenceFrame.ResultList.Text:GetText(),
+    "Small Flame Sac",
+    1,
+    true
+))
+assert(string.find(
+    GuildBankOrganizerCategoryReferenceFrame.ResultList.Text:GetText(),
+    "Custom exact-ID destination: Tab 1 (Classic Herbs)",
+    1,
+    true
+))
+GuildBankOrganizerCategoryReferenceFrame.BackButton.scripts.OnClick()
+assert(addon:SaveDepositProfileDraft(1, {
+    enabled = true,
+    label = "Classic Herbs",
+    categories = { herbs = true },
+    allExpansions = false,
+    expansions = { [0] = true },
+    exactItemIDs = { [3371] = true },
+}))
+finishDepositPlanScan()
+while addon:IsDepositScanning() do
+    runNextTimer()
+end
 GuildBankOrganizerAdvancedFrame.AutoButton.scripts.OnClick()
-runNextTimer()
+for _ = 1, 20 do
+    if GuildBankOrganizerAdvancedFrame.SourceInput:GetText() == "1" then
+        break
+    end
+    runNextTimer()
+end
 assert(GuildBankOrganizerAdvancedFrame.SourceInput:GetText() == "1")
 assert(GuildBankOrganizerAdvancedFrame.EmptyInput:GetText() == "98")
 addon:HideOrganizerUI()
@@ -631,11 +1329,24 @@ runTimers()
 assert(addon.lastScan)
 assert(addon.lastScan.tabs[1].occupied == 1)
 
+addon:GetDepositProfileRecovery()["Test Realm\031Test Guild"]["line\nbreak"] =
+    "malformed string-key fixture"
 assert(addon:StartDiagnostic(1, 1, 2, 1.50, 2))
 runTimers()
 
 assert(not addon:IsDiagnosticRunning())
 assert(addon.lastReport and string.find(addon.lastReport, "result=PASS", 1, true))
+assert(string.find(addon.lastReport, "profileRecovery:", 1, true))
+assert(string.find(addon.lastReport, "__depositProfilesContainer", 1, true))
+assert(string.find(
+    addon.lastReport,
+    "first malformed top-level profile container",
+    1,
+    true
+))
+assert(string.find(addon.lastReport, "Test Realm", 1, true))
+assert(string.find(addon.lastReport, 'tab="line\\nbreak"', 1, true))
+assert(not string.find(addon.lastReport, "tab=line\nbreak", 1, true))
 assert(slots[1][1] and slots[1][1].count == 20)
 assert(slots[1][2] == nil)
 assert(GuildBankOrganizerDB and #GuildBankOrganizerDB.runs == 1)
@@ -730,28 +1441,178 @@ bags[0] = {
     [2] = makeItem(500, 7),
 }
 
+addon:GetDepositProfiles(false)[1] = nil
 addon:ShowDepositSettingsUI()
 local depositSettings = GuildBankOrganizerDepositSettingsFrame
 assert(depositSettings.EnabledCheck:GetChecked())
-depositSettings.EnabledCheck.scripts.OnClick(depositSettings.EnabledCheck)
-assert(not depositSettings.EnabledCheck:GetChecked())
-depositSettings.EnabledCheck.scripts.OnClick(depositSettings.EnabledCheck)
+assert(depositSettings.SaveButton:GetText() == "Save Now")
+assert(depositSettings.SaveState == "new")
+assert(string.find(
+    depositSettings.StatusText:GetText(),
+    "Choose a category or exact item ID",
+    1,
+    true
+))
+assert(addon:GetDepositProfile(1, false) == nil)
+
+local uncheckedCloth = depositSettings.CategoryChecks.cloth
+assert(uncheckedCloth.Top and uncheckedCloth.Top:IsShown())
+assert(uncheckedCloth.Top.color and uncheckedCloth.Box.color)
+assert(
+    uncheckedCloth.Top.color[1] ~= uncheckedCloth.Box.color[1]
+        or uncheckedCloth.Top.color[2] ~= uncheckedCloth.Box.color[2]
+        or uncheckedCloth.Top.color[3] ~= uncheckedCloth.Box.color[3]
+)
+local restingBorder = {
+    uncheckedCloth.Top.color[1],
+    uncheckedCloth.Top.color[2],
+    uncheckedCloth.Top.color[3],
+    uncheckedCloth.Top.color[4],
+}
+uncheckedCloth.mouseOver = true
+uncheckedCloth.scripts.OnEnter(uncheckedCloth)
+assert(
+    uncheckedCloth.Top.color[1] ~= restingBorder[1]
+        or uncheckedCloth.Top.color[2] ~= restingBorder[2]
+        or uncheckedCloth.Top.color[3] ~= restingBorder[3]
+)
+uncheckedCloth.mouseOver = false
+uncheckedCloth.scripts.OnLeave(uncheckedCloth)
+
+depositSettings.CategoryChecks.herbs.scripts.OnClick(
+    depositSettings.CategoryChecks.herbs
+)
+finishDepositPlanScan()
+local autosavedProfile = addon:GetDepositProfile(1, false)
+assert(autosavedProfile and autosavedProfile.enabled)
+assert(autosavedProfile.categories.herbs)
+assert(depositSettings.SaveState == "saved")
+assert(depositSettings.CategoryChecks.herbs.Mark:IsShown())
+assert(depositSettings.CategoryChecks.herbs.Mark.color[1] == 0.10)
+assert(depositSettings.CategoryChecks.herbs.Mark.color[2] == 0.78)
+assert(depositSettings.CategoryChecks.herbs.Mark.color[3] == 0.82)
+
+depositSettings.ExpansionChecks[0].scripts.OnClick(
+    depositSettings.ExpansionChecks[0]
+)
+finishDepositPlanScan()
+autosavedProfile = addon:GetDepositProfile(1, false)
+assert(not autosavedProfile.allExpansions)
+assert(autosavedProfile.expansions[0])
+assert(depositSettings.SaveState == "saved")
+
+depositSettings.LabelInput:SetText("Classic Herbs")
+depositSettings.LabelInput.scripts.OnEnterPressed(depositSettings.LabelInput)
+finishDepositPlanScan()
+assert(addon:GetDepositProfile(1, false).label == "Classic Herbs")
+
+depositSettings.ExactItemsInput:SetText("785")
+depositSettings.ExactItemsInput.scripts.OnEditFocusLost(
+    depositSettings.ExactItemsInput
+)
+finishDepositPlanScan()
+autosavedProfile = addon:GetDepositProfile(1, false)
+assert(autosavedProfile.exactItemIDs[785])
+
+local profileBeforeInvalidExactIDs = addon:GetDepositProfile(1, false)
+for _, invalidText in ipairs({ "-3371", "785.5", "3371x", "0" }) do
+    depositSettings.ExactItemsInput:SetText(invalidText)
+    depositSettings.ExactItemsInput.scripts.OnEditFocusLost(
+        depositSettings.ExactItemsInput
+    )
+    assert(depositSettings.SaveState == "error")
+    assert(string.find(
+        depositSettings.StatusText:GetText(),
+        invalidText,
+        1,
+        true
+    ))
+    assert(string.find(
+        depositSettings.StatusText:GetText(),
+        "positive whole-number",
+        1,
+        true
+    ))
+    assert(addon:GetDepositProfile(1, false) == profileBeforeInvalidExactIDs)
+    assert(profileBeforeInvalidExactIDs.exactItemIDs[785])
+end
+
+depositSettings.ExactItemsInput:SetText("785, 3371\n2604")
+depositSettings.ExactItemsInput.scripts.OnEditFocusLost(
+    depositSettings.ExactItemsInput
+)
+finishDepositPlanScan()
+autosavedProfile = addon:GetDepositProfile(1, false)
+assert(autosavedProfile.exactItemIDs[785])
+assert(autosavedProfile.exactItemIDs[3371])
+assert(autosavedProfile.exactItemIDs[2604])
+
+depositSettings.ExactItemsInput:SetText("   ")
+depositSettings.ExactItemsInput.scripts.OnEditFocusLost(
+    depositSettings.ExactItemsInput
+)
+finishDepositPlanScan()
+assert(not next(addon:GetDepositProfile(1, false).exactItemIDs))
+
+depositSettings.ExactItemsInput:SetText("785")
+depositSettings.ExactItemsInput.scripts.OnEditFocusLost(
+    depositSettings.ExactItemsInput
+)
+finishDepositPlanScan()
+assert(addon:GetDepositProfile(1, false).exactItemIDs[785])
+
+addon:HideOrganizerUI()
+finishDepositPlanScan()
+local profileBeforeProgrammaticLoad = addon:GetDepositProfile(1, false)
+addon:ShowDepositSettingsUI()
+depositSettings = GuildBankOrganizerDepositSettingsFrame
+assert(addon:GetDepositProfile(1, false) == profileBeforeProgrammaticLoad)
+assert(not depositSettings.LoadingProfile)
+assert(depositSettings.TabInput:GetText() == "1")
 assert(depositSettings.EnabledCheck:GetChecked())
-depositSettings.EnabledCheck:SetChecked(true)
+assert(depositSettings.LabelInput:GetText() == "Classic Herbs")
+assert(depositSettings.CategoryChecks.herbs:GetChecked())
+assert(not depositSettings.AllExpansionsCheck:GetChecked())
+assert(depositSettings.ExpansionChecks[0]:GetChecked())
+assert(depositSettings.ExactItemsInput:GetText() == "785")
+
+local lastValidProfile = addon:GetDepositProfile(1, false)
+depositSettings.ExpansionChecks[0]:SetChecked(false)
+depositSettings.HeaderBackButton.scripts.OnClick()
+assert(depositSettings:IsShown())
+assert(addon:GetDepositProfile(1, false) == lastValidProfile)
+assert(depositSettings.SaveState == "error")
+
+depositSettings.ExpansionChecks[0].scripts.OnClick(
+    depositSettings.ExpansionChecks[0]
+)
+finishDepositPlanScan()
+depositSettings.HeaderBackButton.scripts.OnClick()
+assert(not depositSettings:IsShown())
+assert(GuildBankOrganizerFrame:IsShown())
+finishDepositPlanScan()
+
+addon:ShowDepositSettingsUI()
+depositSettings = GuildBankOrganizerDepositSettingsFrame
 depositSettings.LabelInput:SetText("Tailoring & Enchanting")
+depositSettings.CategoryChecks.herbs:SetChecked(false)
 depositSettings.CategoryChecks.cloth:SetChecked(true)
 depositSettings.CategoryChecks.enchanting:SetChecked(true)
 depositSettings.AllExpansionsCheck:SetChecked(false)
+depositSettings.ExpansionChecks[0]:SetChecked(false)
 depositSettings.ExpansionChecks[4]:SetChecked(true)
+depositSettings.ExactItemsInput:SetText("3371")
 depositSettings.SaveButton.scripts.OnClick()
+finishDepositPlanScan()
 local savedProfile = addon:GetDepositProfile(1, false)
 assert(savedProfile and savedProfile.enabled)
 assert(savedProfile.categories.cloth)
 assert(savedProfile.categories.enchanting)
 assert(not savedProfile.allExpansions)
 assert(savedProfile.expansions[4])
+assert(savedProfile.exactItemIDs[3371])
 numGuildBankTabs = 2
-local overlapSaved, overlapMessage = addon:SaveDepositProfile(
+local allClothSaved = addon:SaveDepositProfile(
     2,
     true,
     "All Cloth",
@@ -760,9 +1621,62 @@ local overlapSaved, overlapMessage = addon:SaveDepositProfile(
     {},
     {}
 )
+assert(allClothSaved)
+finishDepositPlanScan()
+local allClothProfile = addon:GetDepositProfile(2, false)
+local bothAllSaved, bothAllMessage = addon:SaveDepositProfile(
+    1,
+    true,
+    "All Cloth Duplicate",
+    { cloth = true },
+    true,
+    {},
+    {}
+)
+assert(not bothAllSaved)
+assert(addon:GetDepositProfile(1, false) == savedProfile)
+assert(string.find(bothAllMessage, "Cloth", 1, true))
+assert(string.find(bothAllMessage, "Tab 1", 1, true))
+assert(string.find(bothAllMessage, "Tab 2", 1, true))
+local overlapSaved, overlapMessage = addon:SaveDepositProfile(
+    2,
+    true,
+    "Mists Cloth",
+    { cloth = true },
+    false,
+    { [4] = true },
+    {}
+)
 assert(not overlapSaved)
-assert(string.find(overlapMessage, "All expansions includes Mists", 1, true))
+assert(addon:GetDepositProfile(2, false) == allClothProfile)
+assert(string.find(overlapMessage, "Cloth", 1, true))
 assert(string.find(overlapMessage, "Tab 1", 1, true))
+assert(string.find(overlapMessage, "Tab 2", 1, true))
+local duplicateExactSaved, duplicateExactMessage = addon:SaveDepositProfile(
+    2,
+    true,
+    "Duplicate vial",
+    {},
+    true,
+    {},
+    { [3371] = true }
+)
+assert(not duplicateExactSaved)
+assert(addon:GetDepositProfile(2, false) == allClothProfile)
+assert(string.find(duplicateExactMessage, "3371", 1, true))
+assert(string.find(duplicateExactMessage, "Tab 1", 1, true))
+assert(string.find(duplicateExactMessage, "Tab 2", 1, true))
+assert(addon:SaveDepositProfile(
+    2,
+    true,
+    "Alchemy category",
+    { alchemy = true },
+    true,
+    {},
+    {}
+))
+addon:AbortDeposit("test profile cleanup")
+addon:GetDepositProfiles(false)[2] = nil
 numGuildBankTabs = 1
 bags[0][3] = makeItem(74249, 20)
 bags[0][3].locked = true
@@ -786,6 +1700,384 @@ assert(GuildBankOrganizerDepositSettingsFrame.EnabledCheck:GetChecked())
 addon:HideOrganizerUI()
 runTimers()
 
+-- Smart Deposit resolves overlapping routes by specificity: exact item IDs
+-- beat expansion-specific categories, which beat All Expansions categories.
+-- A legacy equal-priority tie is reported and only the conflicted item stays
+-- in the bags; unrelated items remain depositable.
+numGuildBankTabs = 3
+currentGuildBankTab = 1
+slots[1] = {}
+slots[2] = {}
+slots[3] = {}
+bags[0] = {
+    [1] = makeItem(785, 3),
+    [2] = makeItem(72234, 4),
+    [3] = makeItem(2447, 5),
+}
+assert(addon:SaveDepositProfile(
+    1,
+    true,
+    "All Herbs",
+    { herbs = true },
+    true,
+    {},
+    {}
+))
+runTimers()
+assert(addon:SaveDepositProfile(
+    2,
+    true,
+    "Mists Herbs",
+    { herbs = true },
+    false,
+    { [4] = true },
+    {}
+))
+runTimers()
+assert(addon:SaveDepositProfile(
+    3,
+    true,
+    "Mageroyal",
+    {},
+    true,
+    {},
+    { [785] = true }
+))
+runTimers()
+
+local routingFixture = {
+    exactItemIDs = {
+        [785] = { { tab = 3 } },
+    },
+    categories = {
+        herbs = {
+            { tab = 1, allExpansions = true, expansions = {} },
+            { tab = 2, allExpansions = false, expansions = { [4] = true } },
+        },
+    },
+}
+local mageroyalTab, mageroyalEvidence = addon:ResolveDepositRoute(
+    routingFixture,
+    addon:ReadDepositBagSlot(0, 1)
+)
+assert(mageroyalTab == 3)
+assert(mageroyalEvidence == "exact item ID")
+local mistsHerbTab, mistsHerbEvidence = addon:ResolveDepositRoute(
+    routingFixture,
+    addon:ReadDepositBagSlot(0, 2)
+)
+assert(mistsHerbTab == 2)
+assert(mistsHerbEvidence == "Trade Goods subclass")
+local classicHerbTab, classicHerbEvidence = addon:ResolveDepositRoute(
+    routingFixture,
+    addon:ReadDepositBagSlot(0, 3)
+)
+assert(classicHerbTab == 1)
+assert(classicHerbEvidence == "All Expansions profile")
+
+local precedencePlan = assert(addon:GetDepositPlan())
+assert(precedencePlan.tabs[1].operations[1].sourceItemID == 2447)
+assert(precedencePlan.tabs[2].operations[1].sourceItemID == 72234)
+assert(precedencePlan.tabs[3].operations[1].sourceItemID == 785)
+assert(#precedencePlan.routingConflicts == 0)
+
+local profiles = addon:GetDepositProfiles(false)
+profiles[3] = {
+    enabled = true,
+    label = "Legacy Mists Herbs",
+    categories = { herbs = true },
+    allExpansions = false,
+    expansions = { [4] = true },
+    exactItemIDs = {},
+    enabledStateVersion = 1,
+}
+profiles[2].exactItemIDs[785] = true
+profiles[3].exactItemIDs[785] = true
+assert(addon:RefreshDepositPlan())
+runTimers()
+local exactConflict = assert(addon:GetFirstDepositRoutingConflict())
+assert(exactConflict.itemID == 785)
+assert(exactConflict.priority == 3)
+addon:ShowOrganizerUI()
+addon:RefreshOrganizerUI()
+local exactConflictMessage = GuildBankOrganizerFrame.SmartHint:GetText()
+assert(string.find(exactConflictMessage, "exact item-ID routes", 1, true))
+assert(string.find(exactConflictMessage, "Tab 2", 1, true))
+assert(string.find(exactConflictMessage, "Tab 3", 1, true))
+assert(not string.find(exactConflictMessage, "nil", 1, true))
+assert(not string.find(exactConflictMessage, "Unknown expansion", 1, true))
+addon:HideOrganizerUI()
+runTimers()
+profiles[2].exactItemIDs[785] = nil
+profiles[3].exactItemIDs[785] = nil
+assert(addon:RefreshDepositPlan())
+runTimers()
+
+local conflictPlan = assert(addon:GetDepositPlan())
+assert(conflictPlan.totalItems == 8)
+assert(conflictPlan.totalMoves == 2)
+assert(#conflictPlan.routingConflicts == 1)
+local conflict = assert(addon:GetFirstDepositRoutingConflict())
+assert(conflict.itemID == 72234)
+assert(conflict.name == "Green Tea Leaf")
+assert(conflict.categoryKey == "herbs")
+assert(conflict.expansionID == 4)
+assert(conflict.priority == 2)
+assert(#conflict.tabs == 2 and conflict.tabs[1] == 2 and conflict.tabs[2] == 3)
+for _, tab in ipairs(conflictPlan.order) do
+    for _, operation in ipairs(conflictPlan.tabs[tab].operations) do
+        assert(operation.sourceItemID ~= 72234)
+    end
+end
+
+addon:ShowOrganizerUI()
+local routingOrganizer = GuildBankOrganizerFrame
+addon:RefreshOrganizerUI()
+local routingMessage = routingOrganizer.SmartHint:GetText()
+assert(string.find(routingMessage, "Green Tea Leaf", 1, true))
+assert(string.find(routingMessage, "Herbs", 1, true))
+assert(string.find(routingMessage, "Mists of Pandaria", 1, true))
+assert(string.find(routingMessage, "Tab 2", 1, true))
+assert(string.find(routingMessage, "Tab 3", 1, true))
+assert(routingOrganizer.SetupButton:GetText() == "Resolve")
+routingOrganizer.SetupButton.scripts.OnClick()
+assert(GuildBankOrganizerDepositSettingsFrame.TabInput:GetText() == "2")
+addon:HideOrganizerUI()
+runTimers()
+
+assert(addon:StartDeposit())
+runTimers()
+assert(bags[0][1] == nil)
+assert(bags[0][2] and bags[0][2].itemID == 72234 and bags[0][2].count == 4)
+assert(bags[0][3] == nil)
+assert(string.find(addon.lastReport, "routingConflicts=1", 1, true))
+assert(string.find(addon.lastReport, "firstRoutingConflictItemID=72234", 1, true))
+assert(string.find(addon.lastReport, "firstRoutingConflictTabs=2,3", 1, true))
+table.remove(GuildBankOrganizerDB.runs, 1)
+
+-- A current-tab deposit must exclude other configured tabs from both the
+-- operation and its reported totals, while the all-tabs preview includes
+-- every enabled destination.
+numGuildBankTabs = 2
+currentGuildBankTab = 1
+slots[1] = {
+    [1] = makeItem(72988, 10),
+}
+slots[2] = {}
+bags[0] = {
+    [1] = makeItem(72988, 15),
+    [2] = makeItem(500, 7),
+}
+assert(addon:SaveDepositProfile(
+    1,
+    true,
+    "Tailoring",
+    { cloth = true },
+    false,
+    { [4] = true },
+    {}
+))
+runTimers()
+assert(addon:SaveDepositProfile(
+    2,
+    true,
+    "Enchanting",
+    { enchanting = true },
+    false,
+    { [4] = true },
+    {}
+))
+runTimers()
+
+local tabScope = assert(addon:GetDepositPlanScope(1))
+assert(tabScope.totalItems == 15)
+assert(tabScope.totalMoves == 2)
+assert(tabScope.destinationCount == 1)
+
+local allScope = assert(addon:GetDepositPlanScope())
+assert(allScope.totalItems == 22)
+assert(allScope.totalMoves == 3)
+assert(allScope.destinationCount == 2)
+
+addon:ShowOrganizerUI()
+local organizer = GuildBankOrganizerFrame
+addon:RefreshOrganizerUI()
+assert(string.find(
+    organizer.SmartHint:GetText(),
+    "This tab: 15 items in 2 deposits",
+    1,
+    true
+))
+assert(string.find(
+    organizer.SmartHint:GetText(),
+    "All configured tabs: 22 items in 3 deposits across 2 tabs",
+    1,
+    true
+))
+assert(organizer.DepositCurrentButton:IsEnabled())
+assert(organizer.DepositAllButton:IsEnabled())
+
+local originalStartDeposit = addon.StartDeposit
+local requestedScopes = {}
+addon.StartDeposit = function(_, tab)
+    table.insert(requestedScopes, tab or "all")
+    return true
+end
+organizer.DepositCurrentButton.scripts.OnClick()
+organizer.DepositAllButton.scripts.OnClick()
+addon.StartDeposit = originalStartDeposit
+assert(requestedScopes[1] == currentGuildBankTab)
+assert(requestedScopes[2] == "all")
+
+currentGuildBankTab = 2
+bags[0][2] = nil
+assert(addon:RefreshDepositPlan())
+organizer:Hide()
+runTimers()
+addon:RefreshOrganizerUI()
+assert(not organizer.DepositCurrentButton:IsEnabled())
+assert(organizer.DepositAllButton:IsEnabled())
+assert(string.find(
+    organizer.SmartHint:GetText(),
+    "This tab: No matching items",
+    1,
+    true
+))
+
+currentGuildBankTab = 1
+bags[0][2] = makeItem(500, 7)
+assert(addon:RefreshDepositPlan())
+runTimers()
+addon:RefreshOrganizerUI()
+assert(organizer.DepositCurrentButton:IsEnabled())
+assert(organizer.DepositAllButton:IsEnabled())
+assert(GuildBankOrganizerDB.settings.depositScope == nil)
+
+addon:ShowDepositSettingsUI()
+local busySettings = GuildBankOrganizerDepositSettingsFrame
+local profileBeforeDeposit = addon:GetDepositProfile(1, false)
+assert(addon:StartDeposit(1))
+assert(addon:IsDepositScanning())
+local scanSaved, scanReason = addon:SaveDepositProfileDraft(1, {
+    enabled = true,
+    label = "Changed during deposit scan",
+    categories = { cloth = true },
+    allExpansions = false,
+    expansions = { [4] = true },
+    exactItemIDs = { [785] = true },
+})
+assert(not scanSaved)
+assert(string.find(scanReason, "active Smart Deposit", 1, true))
+assert(addon:GetDepositProfile(1, false) == profileBeforeDeposit)
+local depositStartAttempts = 0
+while not addon:IsDepositRunning() do
+    runNextTimer()
+    depositStartAttempts = depositStartAttempts + 1
+    assert(depositStartAttempts < 100, "deposit did not enter its running state")
+end
+addon:RefreshOrganizerUI()
+
+local mutationControls = {
+    busySettings.TabInput,
+    busySettings.UseCurrentButton,
+    busySettings.LoadButton,
+    busySettings.LabelInput,
+    busySettings.EnabledCheck,
+    busySettings.AllExpansionsCheck,
+    busySettings.ExactItemsInput,
+    busySettings.SaveButton,
+    busySettings.ScanButton,
+}
+for _, check in pairs(busySettings.CategoryChecks) do
+    table.insert(mutationControls, check)
+end
+for _, check in pairs(busySettings.ExpansionChecks) do
+    table.insert(mutationControls, check)
+end
+for _, control in ipairs(mutationControls) do
+    assert(not control:IsEnabled())
+end
+
+local busySaved, busyReason = addon:SaveDepositProfileDraft(1, {
+    enabled = true,
+    label = "Changed during deposit",
+    categories = { cloth = true },
+    allExpansions = false,
+    expansions = { [4] = true },
+    exactItemIDs = { [785] = true },
+})
+assert(not busySaved)
+assert(string.find(busyReason, "active Smart Deposit", 1, true))
+assert(addon:GetDepositProfile(1, false) == profileBeforeDeposit)
+assert(profileBeforeDeposit.label == "Tailoring")
+assert(not profileBeforeDeposit.exactItemIDs[785])
+
+busySettings.LabelInput:SetText("Autosave must not win")
+busySettings.SaveButton.scripts.OnClick()
+assert(busySettings.SaveState == "error")
+assert(string.find(
+    busySettings.StatusText:GetText(),
+    "active Smart Deposit",
+    1,
+    true
+))
+assert(addon:GetDepositProfile(1, false) == profileBeforeDeposit)
+
+addon:HideOrganizerUI()
+addon:ShowDepositSettingsUI()
+assert(not busySettings:IsShown())
+addon:ShowOrganizerUI()
+addon:RefreshOrganizerUI()
+assert(not organizer.SetupButton:IsEnabled())
+assert(not organizer.DepositCurrentButton:IsShown())
+assert(not organizer.DepositAllButton:IsShown())
+assert(organizer.DepositStopButton:IsShown())
+addon:HideOrganizerUI()
+runTimers()
+
+addon:ShowOrganizerUI()
+addon:RefreshOrganizerUI()
+assert(organizer.SetupButton:IsEnabled())
+addon:ShowDepositSettingsUI()
+assert(busySettings:IsShown())
+for _, control in ipairs(mutationControls) do
+    assert(control:IsEnabled())
+end
+assert(busySettings.LabelInput:GetText() == "Tailoring")
+addon:HideOrganizerUI()
+runTimers()
+
+addon:RefreshOrganizerUI()
+assert(organizer.DepositCurrentButton:IsShown())
+assert(organizer.DepositAllButton:IsShown())
+assert(not organizer.DepositStopButton:IsShown())
+assert(bags[0][1] == nil)
+assert(bags[0][2] and bags[0][2].itemID == 500)
+assert(string.find(addon.lastReport, "planned=2", 1, true))
+assert(string.find(addon.lastReport, "items=15", 1, true))
+
+-- Restore the original one-tab fixture for the full Smart Deposit lifecycle.
+numGuildBankTabs = 1
+currentGuildBankTab = 1
+addon:GetDepositProfiles(false)[2] = nil
+slots[1] = {
+    [1] = makeItem(72988, 10),
+}
+bags[0] = {
+    [1] = makeItem(72988, 15),
+    [2] = makeItem(500, 7),
+}
+assert(addon:SaveDepositProfile(
+    1,
+    true,
+    "Tailoring & Enchanting",
+    { cloth = true, enchanting = true },
+    false,
+    { [4] = true },
+    {}
+))
+runTimers()
+
 local depositPlan = addon:GetDepositPlan()
 assert(depositPlan and depositPlan.totalMoves == 3)
 assert(depositPlan.totalItems == 22)
@@ -802,7 +2094,7 @@ assert(string.find(addon.lastReport, "smart deposit report", 1, true))
 assert(string.find(addon.lastReport, "result=PASS", 1, true))
 assert(string.find(addon.lastReport, "confirmed=3", 1, true))
 assert(string.find(addon.lastReport, "retries=1", 1, true))
-assert(#GuildBankOrganizerDB.runs == 5)
+assert(#GuildBankOrganizerDB.runs == 6)
 assert(GuildBankOrganizerDB.runs[1].type == "deposit")
 assert(GuildBankOrganizerDB.runs[1].averageMoveSeconds < 0.20)
 
@@ -825,10 +2117,23 @@ slots[2] = {}
 addon:ShowDepositSettingsUI()
 fire("GUILDBANKBAGSLOTS_CHANGED")
 assert(GuildBankOrganizerDepositSettingsFrame.TabInput:GetText() == "2")
+GuildBankOrganizerDepositSettingsFrame.CategoryChecks.armor.scripts.OnClick(
+    GuildBankOrganizerDepositSettingsFrame.CategoryChecks.armor
+)
+finishDepositPlanScan()
+GuildBankOrganizerDepositSettingsFrame.LabelInput:SetText("Automatic tab flush")
 currentGuildBankTab = 1
+fire("GUILDBANK_UPDATE_TABS")
+assert(addon:GetDepositProfile(2, false).label == "Automatic tab flush")
+assert(GuildBankOrganizerDepositSettingsFrame.TabInput:GetText() == "1")
+local profileBeforeBankClose = addon:GetDepositProfile(1, false)
+GuildBankOrganizerDepositSettingsFrame.AllExpansionsCheck:SetChecked(false)
+GuildBankOrganizerDepositSettingsFrame.ExpansionChecks[4]:SetChecked(false)
 numGuildBankTabs = 1
 fire("PLAYER_INTERACTION_MANAGER_FRAME_HIDE", Enum.PlayerInteractionType.GuildBanker)
 assert(not addon:IsBankOpen())
 assert(not GuildBankOrganizerFrame:IsShown())
+assert(not GuildBankOrganizerDepositSettingsFrame:IsShown())
+assert(addon:GetDepositProfile(1, false) == profileBeforeBankClose)
 
 print("smoke test passed")
