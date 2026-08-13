@@ -6,7 +6,7 @@
 - [x] Run `tests/smoke.lua`.
 - [x] Run `./scripts/package.sh`.
 - [x] Run `unzip -t` on the generated archive.
-- [x] Promote the tested beta to stable `1.1.0`.
+- [x] Promote the accepted beta to stable `1.2.0`.
 - [ ] Install the generated archive into a clean AddOns directory.
 - [ ] Confirm the compact panel opens with the guild bank.
 - [ ] Confirm the displayed tab changes when selecting another tab.

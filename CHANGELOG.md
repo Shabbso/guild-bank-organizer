@@ -1,5 +1,43 @@
 # Changelog
 
+## 1.2.0 - 2026-08-13
+
+This release substantially expands Smart Deposit while preserving the
+server-safe sorting and confirmation behavior from 1.1.1.
+
+- Added separate **Deposit This Tab** and **Deposit All Tabs** actions, with
+  scope-specific item counts, deposit counts, progress, reports, and a shared
+  **Stop** control.
+- Added a generated MoP Classic profession catalog covering 8,377 public,
+  bank-eligible profession records with zero uncovered items or unreviewed
+  multi-profession assignments.
+- Added Engineering, Tailoring, Leatherworking, First Aid, Archaeology, and
+  **Shared Crafting Reagents** categories, plus more intuitive ownership for
+  parchment, vellum, dyes, vials, pigments, inks, and similar supplies.
+- Added a searchable **Category Reference** in Advanced settings with category
+  definitions, examples, expansion information, exact item-ID diagnostics,
+  and the complete Shared Crafting Reagents list.
+- Made valid Smart Deposit profile edits save automatically and persist across
+  `/reload`; **Save Now** remains available for explicit confirmation.
+- Added safe schema migration and recovery diagnostics for malformed legacy
+  profile data instead of silently discarding it.
+- Made exact item-ID routes override category routes, and specific-expansion
+  routes override **All Expansions** fallbacks.
+- Added actionable equal-priority conflict reporting that names both tabs and
+  leaves only the conflicted item in the player's bags.
+- Added strict exact item-ID validation. Invalid, negative, decimal, zero, or
+  alphanumeric entries leave the last valid saved profile unchanged.
+- Locked profile setup while a scan or deposit is active so an authorized
+  operation cannot change destinations mid-run.
+- Removed reviewed deprecated, obsolete, unused, test, placeholder, and
+  programmer-only records from public routing and text suggestions while
+  retaining exact numeric diagnostics.
+- Added visible outlines to unchecked expansion filters while preserving clear
+  selected-state contrast.
+- Expanded automated coverage for classification, expansion eras, migration,
+  autosave, route precedence, conflicts, current-tab/all-tabs scope, reference
+  search, exact-ID validation, and active-operation safety.
+
 ## 1.2.0-beta.3 - 2026-08-12
 
 - Made valid Smart Deposit profile edits save automatically and survive

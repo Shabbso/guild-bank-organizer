@@ -83,9 +83,19 @@ Optional exact item IDs handle unusual items that Blizzard's general item
 metadata cannot categorize reliably. Bound items are never included in a
 deposit plan.
 
-When eligible materials are found, the compact panel shows the item count,
-number of deposits, and estimated time. Nothing moves until you click
-**Smart Deposit**.
+When eligible materials are found, the compact panel shows separate counts for
+the open tab and all configured tabs. Nothing moves until you explicitly click
+**Deposit This Tab** or **Deposit All Tabs**.
+
+Valid profile edits save automatically and survive `/reload`; **Save Now** is
+available when you want explicit confirmation. Exact item-ID routes override
+category routes, specific-expansion routes override **All Expansions**, and
+equal-priority conflicts leave the affected item in your bags while naming
+both destination tabs.
+
+Advanced settings also includes a searchable **Category Reference**. It shows
+the addon's actual classification, expansion, routing evidence, exact-ID
+diagnostics, category examples, and the complete Shared Crafting Reagents list.
 
 ## Safety and useful diagnostics
 
@@ -114,12 +124,13 @@ blocked by tab access or available space.
 
 ### Configure Smart Deposit
 
-1. Open the guild bank and click **Set Up** under Smart Deposit.
+1. Open the guild bank and click **Set Up** or **Edit** under Smart Deposit.
 2. Choose the destination tab.
 3. Select every item category that belongs there.
 4. Choose **All** expansions or select specific eras.
-5. Save the enabled profile and click **Scan Bags Now**.
-6. Return to the organizer and click **Smart Deposit**.
+5. Enable the profile; valid changes save automatically.
+6. Click **Scan Bags Now**, return to the organizer, and choose **Deposit This
+   Tab** or **Deposit All Tabs**.
 
 ## Commands
 
@@ -239,3 +250,69 @@ Copy the following into the upload's Changelog field:
   assigned tab.
 - Added regression coverage for expansion-era boundaries and affected item
   categories.
+
+## Version 1.2.0 update
+
+- **File:** `dist/GuildBankOrganizer-1.2.0.zip`
+- **Display name:** Guild Bank Organizer 1.2.0
+- **Release options:** Release when approved
+- **Release type:** Release
+- **Supported version:** Mists of Pandaria Classic 5.5.4
+- **Related projects:** None
+
+Copy the following into the upload's Changelog field:
+
+### Guild Bank Organizer 1.2.0
+
+This release substantially expands Smart Deposit while preserving the
+server-safe sorting and move confirmation introduced in earlier versions.
+
+#### Smarter deposit controls
+
+- Added separate **Deposit This Tab** and **Deposit All Tabs** actions so the
+  scope is always explicit.
+- Added scope-specific item totals, deposit counts, progress, reports, and one
+  clear **Stop** control.
+- Kept deposits confirmation-driven with adaptive timing, conservative retry
+  handling, and final server refresh verification.
+
+#### Complete profession categorization
+
+- Added a generated MoP Classic profession catalog covering 8,377 public,
+  bank-eligible profession records with zero uncovered items or unreviewed
+  multi-profession assignments.
+- Added Engineering, Tailoring, Leatherworking, First Aid, Archaeology, and
+  **Shared Crafting Reagents** categories.
+- Assigned obvious parchment, vellum, dyes, vials, pigments, inks, scrolls,
+  schematics, bandages, keystones, and other supplies to intuitive categories.
+- Removed reviewed deprecated, obsolete, unused, test, placeholder, and
+  programmer-only records from public routing and search suggestions.
+
+#### Profiles that reliably persist
+
+- Made valid Smart Deposit profile changes save automatically and survive
+  `/reload`; **Save Now** remains available as explicit confirmation.
+- Added migration and recovery diagnostics for malformed legacy profile data
+  instead of silently discarding it.
+- Locked profile editing while a scan or deposit is active so destinations
+  cannot change during an authorized operation.
+
+#### Predictable routing and clearer conflicts
+
+- Made exact item-ID routes override categories.
+- Made specific-expansion category routes override **All Expansions**.
+- Added equal-priority conflict warnings that identify both destination tabs
+  and leave the conflicted item safely in the player's bags.
+- Added strict exact-ID validation; invalid entries no longer overwrite the
+  last valid profile.
+
+#### Category Reference and UI polish
+
+- Added **Advanced → Category Reference**, with searchable classifications,
+  expansion labels, category explanations, examples, exact-ID diagnostics,
+  and the complete Shared Crafting Reagents list.
+- Added visible outlines to unchecked expansion filters and clearer selected
+  states.
+- Expanded automated regression coverage across categorization, persistence,
+  migration, routing precedence, conflicts, deposit scope, and active-run
+  safety.

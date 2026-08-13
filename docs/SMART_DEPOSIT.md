@@ -156,7 +156,7 @@ from the guild-bank sort cadence, and include the final server refresh.
 
 ## Implementation status
 
-### Implemented through 1.2.0-beta.3
+### Implemented through 1.2.0
 
 - One configurable profile for every purchased guild-bank tab.
 - Any number of categories assigned to each profile, including combinations
