@@ -1,5 +1,53 @@
 # Changelog
 
+## 1.2.1 - 2026-09-22
+
+A smoother Smart Deposit experience, clearer progress, and more reliable handling
+of interrupted guild-bank operations for **Mists of Pandaria Classic**.
+
+### Faster, clearer Smart Deposit
+
+- Bag scanning is shown as soon as the guild bank opens, with destination
+  progress while the addon prepares your deposit preview.
+- Scans check only destinations needed by eligible items in your bags.
+  **Deposit This Tab** prepares only the selected destination.
+- Clicking Deposit can reuse a recent, unchanged verified preview, removing
+  an unnecessary repeat scan. Checks before each move and final verification
+  still run.
+- Moving a planned stack in your bags now shows a prompt stop explanation.
+  An already-issued deposit is allowed to settle before the queue ends.
+- Temporary locks or unavailable space show a waiting status, and background
+  previews no longer hide the reason an operation stopped.
+
+### More reliable operations
+
+- Fixed a rejected deposit being retried after **Stop**.
+- Runs keep track of the items originally selected for deposit. Items that
+  become unavailable remain counted as unfinished; new bag arrivals wait
+  for a later run.
+- Missing bank refresh responses now report incomplete verification instead
+  of accepting cached contents as a successful finish.
+- Improved handling of canceled scans, delayed callbacks, item variants,
+  and permission or bank-state changes during diagnostics.
+- Added **Check Again** and `/gbo verify` to recheck the last operation from
+  the current login session without moving items or replacing its original report.
+
+### Setup, performance, and reports
+
+- Automatic previews keep profile editing responsive. Unchanged saves and
+  profile-name-only edits no longer trigger a bank scan.
+- Fixed the clipped **Destination tab** label and crowded expansion labels.
+- **Copy Report** works before the first operation and includes current
+  configuration and recovery information. Deposit reports include preparation timing.
+- Reduced idle UI updates and repeated sort-estimate work.
+- The detailed Category Reference now loads its records when first needed,
+  reducing startup memory use while preserving existing categories and routing.
+- Added automated regression checks and reproducible release packages.
+
+**Compatibility:** MoP Classic 5.5.4 (Interface 50504). No required dependencies.
+Existing saved profiles are preserved. Fully restart WoW after updating so the
+new addon files load.
+
 ## 1.2.1-beta.2 — in-game feedback fixes (2026-09-22)
 
 - Show automatic bag scanning immediately when the bank opens, with destination
@@ -18,9 +66,9 @@
   to prevent overlap with adjacent controls.
 - Include preflight duration, queried-tab count and preview reuse in reports.
 
-Native acceptance of these follow-up changes is pending. The reported inability
-to withdraw an item during deposits leaves manual test 18 untested; it does not
-establish a failure in the new-arrival simulation.
+The author subsequently reported successful in-game use and authorized promotion
+to 1.2.1. Manual test 18 remains not reproduced because the client prevented
+withdrawing an item during deposits; its automated scenario remains covered.
 
 
 ## 1.2.1-beta.1 — maintenance candidate (2026-09-22)
@@ -43,8 +91,8 @@ establish a failure in the new-arrival simulation.
 - Add Lua 5.1 regression simulations, catalog parity/provenance checks, CI, and
   deterministic ZIP packaging with SHA-256 manifests.
 
-This candidate has not completed live MoP guild-bank acceptance. Move cadences
-are unchanged. Slot events remain untagged; refreshed state is not an independent
+At this candidate stage, live MoP acceptance was pending. Move cadences
+were unchanged. Slot events remain untagged; refreshed state is not an independent
 server acknowledgement. The catalog still uses build 5.5.4.68806.
 
 

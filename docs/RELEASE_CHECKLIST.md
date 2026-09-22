@@ -1,7 +1,13 @@
 # MoP maintenance release checklist
 
-The current package is a local beta candidate. Do not label it live-validated or
-publish it as stable until the native checks below pass.
+## 1.2.1 release decision (2026-09-22)
+
+The author reported successful in-game use after the beta.2 fixes and explicitly
+authorized the official release. Version 1.2.1 promotes that tested Lua code;
+only the version and release documentation change. Automated checks cover the
+source and packaged addon. The native checklist below remains a reusable test
+procedure, not a list of individually confirmed passes. Manual test 18 was
+blocked by the client and remains not reproduced.
 
 ## Automated candidate checks
 
@@ -12,7 +18,7 @@ publish it as stable until the native checks below pass.
   development files; archive CRC and per-file SHA-256 manifest validate.
 - Repeated package builds produce identical bytes.
 
-## Live MoP acceptance (pending)
+## Live MoP test procedure
 
 Use the candidate on MoP Classic with disposable test stacks, a current backup of
 GuildBankOrganizerDB, and a guild tab with known permissions.
@@ -67,6 +73,16 @@ stable version bump, merge and public release are separate subsequent actions.
 4. Move a not-yet-deposited stack during a run. Expect a prompt stop explanation,
    with any active deposit allowed to settle. The next preview must not hide it.
 5. Check that Destination tab appears fully above its input and all expansion
-   labels fit between their checkboxes. Native font/scale acceptance is pending.
+   labels fit between their checkboxes. The general retest was accepted; results
+   at every font/UI scale were not individually recorded.
 6. Manual test 18 (withdrawing a new item during depositing) was blocked by the
    client. Leave it marked not reproduced; no forced workaround is required.
+
+## Rollback
+
+If 1.2.1 causes a regression, close WoW and back up the current addon directory
+and GuildBankOrganizerDB SavedVariables files. Replace the addon directory with
+the official v1.2.0 archive from GitHub, then restart the client. The saved-profile
+schema is unchanged. Retain the backup and copy the 1.2.1 report for diagnosis.
+The v1.2.0 release and its asset remain available; publishing 1.2.1 does not
+replace or delete that recovery artifact.

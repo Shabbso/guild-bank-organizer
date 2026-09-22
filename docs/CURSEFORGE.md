@@ -25,138 +25,28 @@ The project name intentionally omits the game and version. CurseForge's current
 moderation policy asks authors to put technical compatibility information in
 the description and file tags instead of the project name.
 
-## Description
+## Current release: 1.2.1
 
-Copy everything below this line into the CurseForge description editor.
+- **Project:** https://www.curseforge.com/wow/addons/guild-bank-organizer
+- **Project ID:** 1626833
+- **File:** `dist/GuildBankOrganizer-1.2.1.zip`
+- **Display name:** Guild Bank Organizer 1.2.1
+- **Release options:** Release when approved
+- **Release type:** Release
+- **Supported version:** Mists of Pandaria Classic 5.5.4 only
+- **Related projects:** None
+- **Changelog:** Copy [the 1.2.1 release notes](releases/1.2.1.md).
+- **Description:** Copy [the updated project description](CURSEFORGE_DESCRIPTION.md).
 
----
+The existing project summary, categories, license, logo, source link and gallery
+can remain as configured. This update uses the same verified ZIP as GitHub.
+The description and changelog are separate fields; do not paste this release
+kit or the entire historical changelog into either field.
 
-# Keep your guild bank organized—without outrunning the server
+## Previous publication metadata
 
-Guild Bank Organizer adds a compact control panel beside the guild bank in
-**World of Warcraft: Mists of Pandaria Classic**. It safely stacks, compacts,
-and sorts the selected bank tab, then helps route profession materials from
-your bags into the tabs you assign.
-
-It is designed around the guild bank's server-side movement limits. Every
-sorting move is confirmed before the next begins, progress is shown in real
-time, and the operation stops if the observed bank state becomes unsafe or
-unexpected.
-
-## One-click tab sorting
-
-Select a guild-bank tab and click **Sort This Tab**. The addon will:
-
-- consolidate matching partial stacks;
-- compact items into the earliest available slots;
-- arrange items using familiar bag-style priorities;
-- show the estimated moves, moves remaining, and a live ETA;
-- verify every move and replan from fresh bank state;
-- perform a delayed server refresh before declaring success.
-
-Sorting uses a live-tested 1.25-second minimum cadence for MoP Classic guild
-banks. Busy tabs can take a minute or two, but the progress display always
-shows what remains.
-
-## Smart Deposit
-
-Create a profile for each guild-bank tab, choose what belongs there, and let
-the addon scan your bags for eligible items.
-
-A single tab can accept multiple categories—for example:
-
-- Cloth + Enchanting;
-- Herbs + Alchemy + Inscription;
-- Ore, Bars & Stone + Elemental;
-- Food + Fish & Raw Cooking;
-- Leather + Armor.
-
-Profiles can also be filtered by expansion:
-
-- Classic;
-- The Burning Crusade;
-- Wrath of the Lich King;
-- Cataclysm;
-- Mists of Pandaria.
-
-Optional exact item IDs handle unusual items that Blizzard's general item
-metadata cannot categorize reliably. Bound items are never included in a
-deposit plan.
-
-When eligible materials are found, the compact panel shows separate counts for
-the open tab and all configured tabs. Nothing moves until you explicitly click
-**Deposit This Tab** or **Deposit All Tabs**.
-
-Valid profile edits save automatically and survive `/reload`; **Save Now** is
-available when you want explicit confirmation. Exact item-ID routes override
-category routes, specific-expansion routes override **All Expansions**, and
-equal-priority conflicts leave the affected item in your bags while naming
-both destination tabs.
-
-Advanced settings also includes a searchable **Category Reference**. It shows
-the addon's actual classification, expansion, routing evidence, exact-ID
-diagnostics, category examples, and the complete Shared Crafting Reagents list.
-
-## Safety and useful diagnostics
-
-Guild Bank Organizer:
-
-- runs only one bank operation at a time;
-- checks view and deposit permissions;
-- confirms the source and destination of every operation;
-- stops on unexpected cursor, lock, combat, tab, bag, or bank changes;
-- waits for temporarily locked bag items and rescans automatically;
-- retries a rejected deposit only after proving both endpoints are unchanged;
-- creates copyable diagnostic reports for troubleshooting.
-
-If an item cannot be deposited, setup explains whether it is soulbound,
-temporarily locked, filtered by expansion, not yet loaded, unclassified, or
-blocked by tab access or available space.
-
-## Getting started
-
-### Sort a tab
-
-1. Open the guild bank.
-2. Select the tab you want to organize.
-3. Click **Sort This Tab**.
-4. Leave the bank and selected tab alone until verification finishes.
-
-### Configure Smart Deposit
-
-1. Open the guild bank and click **Set Up** or **Edit** under Smart Deposit.
-2. Choose the destination tab.
-3. Select every item category that belongs there.
-4. Choose **All** expansions or select specific eras.
-5. Enable the profile; valid changes save automatically.
-6. Click **Scan Bags Now**, return to the organizer, and choose **Deposit This
-   Tab** or **Deposit All Tabs**.
-
-## Commands
-
-- `/gbo` — open the organizer
-- `/gbo sort` — sort the selected tab
-- `/gbo deposits` — open Smart Deposit setup
-- `/gbo scan` — refresh the bank and deposit plan
-- `/gbo stop` — stop the active operation
-- `/gbo report` — open the latest copyable report
-- `/gbo help` — show every command
-
-## Compatibility
-
-- World of Warcraft: Mists of Pandaria Classic
-- Interface: 50504
-- Tested client: 5.5.4
-- No required dependencies
-- ElvUI is supported but not required
-
-Retail, Classic Era, Cataclysm Classic, and other clients are not currently
-supported.
-
-Guild Bank Organizer is an independent addon and is not affiliated with or
-endorsed by Blizzard Entertainment, ElvUI, Overwolf, or CurseForge.
-
----
+The sections below record earlier uploads. Use the current release fields above
+for 1.2.1.
 
 ## First file upload
 

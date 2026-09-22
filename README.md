@@ -1,7 +1,7 @@
 # Guild Bank Organizer
 
-One-button, rate-limited guild-bank sorting for World of Warcraft: Mists of
-Pandaria Classic.
+Guild-bank sorting and profile-based Smart Deposit for World of Warcraft:
+Mists of Pandaria Classic.
 
 Guild Bank Organizer stacks, compacts, and sorts the currently selected
 guild-bank tab through a small panel that opens beside the bank. It has no
@@ -44,7 +44,7 @@ The installed layout should be:
 Interface/AddOns/GuildBankOrganizer/GuildBankOrganizer.toc
 ```
 
-Restart the game or run `/reload`.
+Fully restart World of Warcraft after updating so newly added addon files load.
 
 ## Usage
 
@@ -223,8 +223,9 @@ Do not manually interact with the guild bank while an operation is running.
 
 - World of Warcraft: Mists of Pandaria Classic
 - Interface: `50504`
-- Published v1.2.0 tested client: `5.5.4`
-- Maintenance candidate: `1.2.1-beta.2`, automated tests passed; live MoP acceptance pending
+- Release: `1.2.1`
+- Client: `5.5.4`; author reports successful in-game use of the promoted beta.2 build
+- Automated validation and remaining native test limits: [validation notes](docs/MAINTENANCE_VALIDATION.md)
 
 The project currently targets MoP Classic only. Retail, Classic Era, Cataclysm
 Classic, and other clients should not be marked compatible without separate

@@ -1,9 +1,11 @@
-# 1.2.1-beta.2 maintenance validation
+# 1.2.1 maintenance validation
 
 Base: published v1.2.0, commit `0f32a4bdd9521c2302a642ec82d41754265c143e`.
-Candidate date: 2026-09-22. Scope: MoP Classic only. This includes the beta.1
-maintenance work and the beta.2 changes below. The public stable release is
-unchanged. Native acceptance of beta.2 is pending.
+Release date: 2026-09-22. Scope: MoP Classic only. This promotes the beta.1
+maintenance work and beta.2 feedback fixes with no further Lua behavior changes.
+After the installed beta.2 retest, the author reported that it works very well
+and authorized the official 1.2.1 release. This is a general in-game acceptance
+report, not a claim that every manual edge case below passed individually.
 
 ## Audit coverage
 
@@ -37,9 +39,9 @@ unchanged. Native acceptance of beta.2 is pending.
 - ZIP CRC/per-file manifest checks pass; repeated builds are byte-identical.
 - `git diff --check` passes.
 
-GitHub Actions is configured but has not run remotely for this local candidate.
-Checks above run locally; the workflow uses read-only repository permissions and
-has no publication step.
+The same correctness checks run in GitHub Actions before release. The workflow
+uses read-only repository permissions and has no automatic publication step;
+release artifacts are verified and published separately.
 
 ## Beta.2: native feedback and response
 
@@ -100,6 +102,10 @@ The original CSV inputs are unavailable. The snapshot preserves the published
 5.5.4.68806 catalog and records its hash; future regeneration records raw CSV
 hashes. There is no claim of a new live taxonomy audit.
 
-Visual layout, real query throttling, protected actions/taint, concurrent guild
-members, and native memory measurements require the steps in RELEASE_CHECKLIST.md.
-The candidate is ready for those tests, not a stable/public release declaration.
+The author accepted general in-game behavior after the beta.2 retest. Individual
+results for every font/scale, protected-action/taint condition, concurrent guild
+edit, and native memory measurement were not supplied. Those remain explicit
+limits of the release evidence; RELEASE_CHECKLIST.md retains the test procedure.
+Manual test 18 remains not reproduced because the client prevented withdrawal
+during an active deposit. Automated coverage does not replace that missing
+native observation.
