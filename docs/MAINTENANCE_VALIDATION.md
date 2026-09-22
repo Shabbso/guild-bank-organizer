@@ -1,8 +1,9 @@
-# 1.2.1-beta.1 maintenance validation
+# 1.2.1-beta.2 maintenance validation
 
 Base: published v1.2.0, commit `0f32a4bdd9521c2302a642ec82d41754265c143e`.
-Candidate date: 2026-09-22. Scope: MoP Classic only. The installed addon and
-published release remain unchanged. Native acceptance is pending.
+Candidate date: 2026-09-22. Scope: MoP Classic only. This includes the beta.1
+maintenance work and the beta.2 changes below. The public stable release is
+unchanged. Native acceptance of beta.2 is pending.
 
 ## Audit coverage
 
@@ -27,7 +28,7 @@ published release remain unchanged. Native acceptance is pending.
 ## Automated evidence
 
 - Original smoke suite passes under Lua 5.1 through Lupa 2.8.
-- 24 targeted scenarios pass in isolated runtimes, including cancellation at
+- 33 targeted scenarios pass in isolated runtimes, including cancellation at
   multiple operation phases and comparator properties in both directions.
 - 13 Python tests pass, including field-by-field parity for every published
   reference record and routing lookup.
@@ -39,6 +40,40 @@ published release remain unchanged. Native acceptance is pending.
 GitHub Actions is configured but has not run remotely for this local candidate.
 Checks above run locally; the workflow uses read-only repository permissions and
 has no publication step.
+
+## Beta.2: native feedback and response
+
+The user reported that opening the bank showed no eligible bag items while a
+scan actually ran for approximately 10–12 seconds. Deposit repeated a lengthy
+preflight, and relocating a planned linen stack stopped the operation with a
+late screen update. The screenshot showed Destination tab behind its input and
+crowded expansion labels. Attempting test 18 was blocked by the client; record
+that manual case as not reproduced, while retaining the automated new-item test.
+
+New scenarios cover immediate scan indicators; relevant-tab and selected-tab
+query scope; reuse of an unchanged verified preview; invalidation by event, age,
+changed contents or bank close; competing read ownership; a destination added
+during preflight; prompt bag-change stopping; visible lock waits; and recheck
+result visibility. The original editing-lock test explicitly invalidates the
+preview so it continues to exercise preparation locking.
+
+`python scripts/benchmark_deposit_start.py` compares the beta.1 commit `bc57905`
+with the working candidate under identical simulated, immediate query responses:
+
+| Eight enabled profiles, matching bag items for one tab | Beta.1 | Beta.2 |
+| --- | ---: | ---: |
+| Opening preview queries | 16 | 2 |
+| Preview readiness | 7.6 seconds | 0.6 seconds |
+| Additional queries after clicking Deposit | 16 | 0 |
+| Click to first deposit with that unchanged preview | 8 seconds | 0 seconds |
+
+These are deterministic simulation timings, not measured live MoP timings.
+Native response latency and whether the preview remains valid affect actual
+results. Mutation pacing and final verification remain unchanged.
+
+The new preflight report fields (`preflightSeconds`, `preflightTabs`,
+`reusedPreview`) make the remaining live delay measurable. Source and packaged
+addon both pass the same regression suite.
 
 ## Memory measurement
 

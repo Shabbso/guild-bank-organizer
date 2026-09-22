@@ -49,6 +49,9 @@ end
 -- evidence of a refreshed view, not a protocol-level server acknowledgement.
 local pending
 local lastQueryAt
+local bankActivityRevision = 0
+
+function GBO:GetBankActivityRevision() return bankActivityRevision end
 
 function GBO:CancelBankRead(owner)
     if pending and pending.owner == owner then pending = nil end
@@ -58,7 +61,7 @@ function GBO:IsBankReadPending()
     return pending ~= nil
 end
 
-local function signature(tab)
+function GBO:GetBankTabSignature(tab)
     local parts = {}
     for slot = 1, GBO.MAX_SLOTS do
         local item = GBO:ReadSlot(tab, slot)
@@ -127,6 +130,7 @@ function GBO:ReadBankTab(owner, tab, callback)
 end
 
 GBO:On("GUILDBANKBAGSLOTS_CHANGED", function()
+    bankActivityRevision = bankActivityRevision + 1
     local request = pending
     if not request or request.queued or request.phase == 0 then return end
     request.events = request.events + 1
@@ -144,7 +148,7 @@ GBO:On("GUILDBANKBAGSLOTS_CHANGED", function()
             finish(request, false, "tab is no longer viewable")
             return
         end
-        local snapshot = signature(request.tab)
+        local snapshot = GBO:GetBankTabSignature(request.tab)
         if snapshot and snapshot == request.previous then
             finish(request, true)
         elseif phase >= 3 then

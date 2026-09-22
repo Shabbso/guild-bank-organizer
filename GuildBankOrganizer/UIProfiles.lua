@@ -157,28 +157,28 @@ function UI.createDepositSettingsFrame()
         "1. Pick a destination tab.  2. Choose what belongs there.  3. Save and scan."
     )
 
-    UI.createLabel(frame, "1  Destination tab", 20, -72)
-    frame.TabInput = UI.createInput(frame, 54, 58, -66)
+    UI.createLabel(frame, "1  Destination tab", 20, -60)
+    frame.TabInput = UI.createInput(frame, 54, 20, -80)
     frame.UseCurrentButton = UI.createButton(frame, "Use Current", 100, 24, function()
         if UI.flushDepositSettingsDraft("use-current") then
             UI.loadDepositSettings(UI.currentTab())
         end
     end)
-    frame.UseCurrentButton:SetPoint("TOPLEFT", 124, -66)
+    frame.UseCurrentButton:SetPoint("TOPLEFT", 84, -80)
     frame.LoadButton = UI.createButton(frame, "Load Tab", 90, 24, function()
         if UI.flushDepositSettingsDraft("load-tab") then
             UI.loadDepositSettings(frame.TabInput:GetText())
         end
     end)
-    frame.LoadButton:SetPoint("TOPLEFT", 234, -66)
+    frame.LoadButton:SetPoint("TOPLEFT", 194, -80)
 
     frame.TabTitle = frame:CreateFontString(nil, "OVERLAY", "GameFontNormal")
-    frame.TabTitle:SetPoint("TOPLEFT", 334, -72)
-    frame.TabTitle:SetPoint("TOPRIGHT", -18, -72)
+    frame.TabTitle:SetPoint("TOPLEFT", 294, -86)
+    frame.TabTitle:SetPoint("TOPRIGHT", -18, -86)
     frame.TabTitle:SetJustifyH("RIGHT")
 
-    UI.createLabel(frame, "Name", 20, -112)
-    frame.LabelInput = UI.createInput(frame, 210, 112, -106)
+    UI.createLabel(frame, "Name", 20, -118)
+    frame.LabelInput = UI.createInput(frame, 210, 112, -112)
     frame.LabelInput:SetJustifyH("LEFT")
     frame.LabelInput:SetScript("OnEnterPressed", function(self)
         commitInput(self, "label-enter", true)
@@ -190,7 +190,7 @@ function UI.createDepositSettingsFrame()
         frame,
         "Enable this tab profile",
         330,
-        -106,
+        -112,
         function()
             UI.flushDepositSettingsDraft("checkbox")
         end
@@ -276,7 +276,9 @@ function UI.createDepositSettingsFrame()
                 UI.flushDepositSettingsDraft("checkbox")
             end
         )
-        check.Label:SetWidth(58)
+        check.Label:SetFontObject(GameFontHighlightSmall)
+        check.Label:SetJustifyH("LEFT")
+        check.Label:SetWidth(37)
         frame.ExpansionChecks[expansion.id] = check
     end
     local expansionHelp = frame:CreateFontString(nil, "OVERLAY", "GameFontDisableSmall")

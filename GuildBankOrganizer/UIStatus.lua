@@ -300,7 +300,9 @@ function GBO:RefreshOrganizerUI()
     local busy = UI.isBusy()
     local sorting = self.IsSortRunning and self:IsSortRunning()
     local depositing = self.IsDepositRunning and self:IsDepositRunning()
-    local depositScanning = self.IsDepositScanning and self:IsDepositScanning()
+    local scanProgress = self:GetDepositScanProgress()
+    local depositScanning = scanProgress ~= nil
+    local depositNotice = self:GetDepositNotice()
     local depositPlan = self.GetDepositPlan and self:GetDepositPlan()
     local depositsAvailable = depositPlan and depositPlan.totalMoves > 0
     local currentScope = tab and self.GetDepositPlanScope
@@ -348,14 +350,20 @@ function GBO:RefreshOrganizerUI()
             UI.organizerFrame.StatusText:SetText("Checking again without moving items...")
         elseif depositing then
             UI.organizerFrame.StatusText:SetText(self:GetDepositStatus())
-        elseif depositScanning then
-            UI.organizerFrame.StatusText:SetText("Scanning bags and assigned tabs...")
         elseif sorting then
             UI.organizerFrame.StatusText:SetText(self:GetSortStatus())
         elseif self:IsDiagnosticRunning() then
             UI.organizerFrame.StatusText:SetText("Advanced diagnostic is running.")
         elseif self:IsScanRunning() then
             UI.organizerFrame.StatusText:SetText("Scanning guild-bank tabs...")
+        elseif depositNotice then
+            UI.organizerFrame.StatusText:SetText("Stopped: " .. depositNotice)
+        elseif depositScanning then
+            UI.organizerFrame.StatusText:SetText(scanProgress.message)
+        elseif self.lastOutcome and self.lastOutcome.type == "verification" then
+            UI.organizerFrame.StatusText:SetText(
+                (self.lastOutcome.ok and "Checked: " or "Check incomplete: ") .. self.lastOutcome.reason
+            )
         elseif routingConflict then
             UI.organizerFrame.StatusText:SetText(
                 "Smart Deposit needs attention: resolve a routing conflict."
@@ -379,17 +387,21 @@ function GBO:RefreshOrganizerUI()
             local progressMaximum = progress.total > 0 and progress.total or 1
             UI.organizerFrame.ProgressBar:SetMinMaxValues(0, progressMaximum)
             UI.organizerFrame.ProgressBar:SetValue(progress.completed)
-            UI.organizerFrame.ProgressBar.Text:SetText(string.format(
-                "%d / %d confirmed • %d left • about %s",
-                progress.completed,
-                progress.total,
-                progress.remaining,
-                progress.etaText
-            ))
+            if progress.stage == "blocked" or progress.stopping then
+                UI.organizerFrame.ProgressBar.Text:SetText(self:GetDepositStatus())
+            else
+                UI.organizerFrame.ProgressBar.Text:SetText(string.format(
+                    "%d / %d confirmed • %d left • about %s",
+                    progress.completed,
+                    progress.total,
+                    progress.remaining,
+                    progress.etaText
+                ))
+            end
         elseif depositScanning then
-            UI.organizerFrame.ProgressBar:SetMinMaxValues(0, 1)
-            UI.organizerFrame.ProgressBar:SetValue(0)
-            UI.organizerFrame.ProgressBar.Text:SetText("Checking bags and deposit profiles...")
+            UI.organizerFrame.ProgressBar:SetMinMaxValues(0, math.max(1, scanProgress.total))
+            UI.organizerFrame.ProgressBar:SetValue(scanProgress.completed)
+            UI.organizerFrame.ProgressBar.Text:SetText(scanProgress.detail)
         elseif sorting then
             local progress = self:GetSortProgress()
             local progressMaximum = progress.total and progress.total > 0
@@ -435,7 +447,7 @@ function GBO:RefreshOrganizerUI()
                     "Depositing selected items. Stop waits for the active move to settle."
                 )
             elseif depositScanning then
-                UI.organizerFrame.SmartHint:SetText("Checking bags and assigned tabs...")
+                UI.organizerFrame.SmartHint:SetText(scanProgress.detail)
             else
                 UI.organizerFrame.SmartHint:SetText(
                     "Finish or stop the active organizer operation before depositing."
@@ -444,6 +456,12 @@ function GBO:RefreshOrganizerUI()
             UI.organizerFrame.SetupButton:SetText(
                 self:HasEnabledDepositProfiles() and "Edit" or "Set Up"
             )
+        elseif depositNotice then
+            UI.organizerFrame.SmartHint:SetText(depositNotice)
+            UI.organizerFrame.SetupButton:SetText("Edit")
+        elseif depositScanning then
+            UI.organizerFrame.SmartHint:SetText(scanProgress.detail)
+            UI.organizerFrame.SetupButton:SetText("Edit")
         elseif routingConflict then
             UI.organizerFrame.SmartHint:SetText(UI.formatRoutingConflict(routingConflict))
             UI.organizerFrame.SetupButton:SetText("Resolve")
@@ -513,8 +531,12 @@ function GBO:RefreshOrganizerUI()
 
         if self:IsVerificationRunning() then
             UI.advancedFrame.StatusText:SetText("Checking again without moving items...")
-        elseif depositing or depositScanning then
+        elseif depositing then
             UI.advancedFrame.StatusText:SetText(self:GetDepositStatus())
+        elseif depositNotice then
+            UI.advancedFrame.StatusText:SetText("Stopped: " .. depositNotice)
+        elseif depositScanning then
+            UI.advancedFrame.StatusText:SetText(scanProgress.message .. " " .. scanProgress.detail)
         elseif sorting then
             UI.advancedFrame.StatusText:SetText(self:GetSortStatus())
         elseif self:IsDiagnosticRunning() then

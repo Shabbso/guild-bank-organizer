@@ -53,3 +53,20 @@ stable version bump, merge and public release are separate subsequent actions.
 - Capture the compact panel and before/after guild-bank screenshots.
 - Promote the accepted beta version and attach the correct MoP Classic file
   metadata only when the stable release is authorized.
+
+## Beta.2 focused retest
+
+1. Open the bank with matching bag items. Expect Scanning bags immediately,
+   destination progress while waiting, then enabled deposit buttons.
+2. With profiles for several tabs but matching bag items for just one, confirm
+   opening no longer waits through every configured tab.
+3. Click Deposit soon after the preview becomes ready. Expect no repeated scan
+   if it is still valid. In the report, expect `reusedPreview=true` and
+   `preflightTabs=0` for that case. After expiry/changed bank contents, expect
+   visible preparation for only the required destination(s).
+4. Move a not-yet-deposited stack during a run. Expect a prompt stop explanation,
+   with any active deposit allowed to settle. The next preview must not hide it.
+5. Check that Destination tab appears fully above its input and all expansion
+   labels fit between their checkboxes. Native font/scale acceptance is pending.
+6. Manual test 18 (withdrawing a new item during depositing) was blocked by the
+   client. Leave it marked not reproduced; no forced workaround is required.

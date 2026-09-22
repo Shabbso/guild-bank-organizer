@@ -1,5 +1,28 @@
 # Changelog
 
+## 1.2.1-beta.2 — in-game feedback fixes (2026-09-22)
+
+- Show automatic bag scanning immediately when the bank opens, with destination
+  progress instead of an empty/no-matching-items message during the scan.
+- Query only destinations with eligible bag items. Deposit This Tab preflight
+  queries only its chosen destination.
+- Reuse a recent verified preview on Deposit instead of scanning every tab again.
+  Reuse requires the same bank session, no intervening bank slot event, unchanged
+  unlocked tab contents, no competing read, and per-tab verification within 15
+  seconds. Every mutation still validates its endpoints; final verification stays.
+- Stop promptly when a planned bag source changes, while allowing an in-flight
+  deposit to settle. Temporary locks/space waits show an explicit waiting status.
+- Keep the stop reason visible while an automatic preview refreshes. Show recheck
+  results instead of replacing them with a ready-to-deposit message.
+- Place Destination tab on its own label row and tighten expansion label bounds
+  to prevent overlap with adjacent controls.
+- Include preflight duration, queried-tab count and preview reuse in reports.
+
+Native acceptance of these follow-up changes is pending. The reported inability
+to withdraw an item during deposits leaves manual test 18 untested; it does not
+establish a failure in the new-arrival simulation.
+
+
 ## 1.2.1-beta.1 — maintenance candidate (2026-09-22)
 
 - Prevent Smart Deposit retries after Stop. Track originally intended items and

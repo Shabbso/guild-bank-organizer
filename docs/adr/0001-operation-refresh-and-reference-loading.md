@@ -59,3 +59,24 @@ incurs its full table cost; this is deferred allocation, not a smaller full cata
   original CSV provenance is stated rather than invented.
 - Native appearance, taint/protected actions, real throttling, and concurrent guild
   edits remain client tests. Offline simulations do not certify those behaviors.
+
+## Beta.2 amendment: avoid duplicate preparation and expose waiting
+
+The first native feedback exposed the cost of refreshing every configured tab
+on both opening and clicking Deposit. Preparation now derives destinations from
+current eligible bag items and the requested scope. Before it hands control to
+the queue, it also checks for newly introduced destinations and verifies them.
+
+A completed preview carries each verified tab's signature/timestamp and the bank
+activity revision at completion. Reuse requires every needed tab to be verified
+within 15 seconds, no subsequent slot event, matching unlocked signatures, the
+same bank session, and no competing read owner. A new destination, changed tab,
+expired certificate or bank activity takes the normal preparation path. Current
+bag sources, permissions and target slots are still checked before each move;
+final reads are not replaced by preview evidence.
+
+UI busy state continues to lock edits only for explicit preparation/movement.
+A separate scan-progress model exposes queued and passive preview work without
+locking editing. Relocated/changed sources stop promptly; locked sources retain
+a bounded visible wait. Terminal deposit notices survive automatic preview
+refreshes until the next explicit operation or bank visit.

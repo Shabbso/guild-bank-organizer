@@ -121,6 +121,18 @@ changed sources remain unresolved rather than disappearing from the completion
 count, and newly arriving bag items wait for a later run. Nothing moves
 until the player clicks one of the two explicit deposit actions.
 
+When the bank opens, Smart Deposit immediately shows **Scanning bags** and then
+its destination progress. It queries only tabs relevant to the items in your bags.
+**Deposit This Tab** prepares only its chosen destination. A verified preview from
+the last 15 seconds can be reused when the bank state is unchanged, so clicking
+Deposit need not repeat that scan. An expired preview, bank event, changed/locked
+contents, newly required destination or competing read requires preparation again.
+Final verification still refreshes every destination that received deposits.
+
+Moving a planned stack in your bags stops the queue with a visible explanation;
+an already issued deposit can settle first. Temporary locks instead show a waiting
+state. A background preview does not overwrite the stop reason.
+
 Category rules are based on the client item class, subclass, equipment slot,
 profession recipe graph, specialized-bag metadata, source-backed item era, or
 an explicit item-ID list. MoP Classic can report
@@ -212,7 +224,7 @@ Do not manually interact with the guild bank while an operation is running.
 - World of Warcraft: Mists of Pandaria Classic
 - Interface: `50504`
 - Published v1.2.0 tested client: `5.5.4`
-- Maintenance candidate: `1.2.1-beta.1`, automated tests passed; live MoP acceptance pending
+- Maintenance candidate: `1.2.1-beta.2`, automated tests passed; live MoP acceptance pending
 
 The project currently targets MoP Classic only. Retail, Classic Era, Cataclysm
 Classic, and other clients should not be marked compatible without separate

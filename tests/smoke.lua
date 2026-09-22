@@ -1953,6 +1953,8 @@ assert(GuildBankOrganizerDB.settings.depositScope == nil)
 addon:ShowDepositSettingsUI()
 local busySettings = GuildBankOrganizerDepositSettingsFrame
 local profileBeforeDeposit = addon:GetDepositProfile(1, false)
+-- Invalidate the ready preview to exercise the explicit preflight lock.
+fire("GUILDBANKBAGSLOTS_CHANGED")
 assert(addon:StartDeposit(1))
 assert(addon:IsDepositScanning())
 local scanSaved, scanReason = addon:SaveDepositProfileDraft(1, {

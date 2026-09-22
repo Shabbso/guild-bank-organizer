@@ -20,6 +20,7 @@ GBO.defaults = {
     depositMaxRetries = 1,
     depositFinalDelay = 0.50,
     depositMaxMoves = 500,
+    depositPreviewMaxAge = 15.0,
 }
 
 local metadata = (C_AddOns and C_AddOns.GetAddOnMetadata) or GetAddOnMetadata

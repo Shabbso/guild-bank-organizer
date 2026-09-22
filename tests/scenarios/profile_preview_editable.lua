@@ -1,4 +1,5 @@
 configure(1)
+bags[0]={[1]=makeItem(72988,10)}
 local queries=0
 QueryGuildBankTab=function() queries=queries+1;fire("GUILDBANKBAGSLOTS_CHANGED") end
 local function draft(label, enabled)
