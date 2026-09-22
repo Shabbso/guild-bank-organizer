@@ -1,0 +1,5 @@
+assert(not addon.professionReferenceLoaded)
+assert(addon:GetGeneratedProfessionCategory(3371)=="alchemy")
+assert(not addon.professionReferenceLoaded, "routing must not decode reference records")
+assert(addon:GetProfessionReferenceItem(3371).name=="Crystal Vial")
+assert(addon.professionReferenceLoaded)

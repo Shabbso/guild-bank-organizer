@@ -185,6 +185,16 @@ from the guild-bank sort cadence, and include the final server refresh.
 - Scan diagnostics for soulbound, locked, expansion-filtered, unloaded,
   unclassified, permission, and no-space conditions.
 
+### Maintenance candidate 1.2.1-beta.1
+
+Automatic routing previews are debounced and remain editable; unchanged and
+label-only saves do not query the bank. Explicit scans and execution preflight
+still lock routing edits. Stop forbids a new retry. A source ledger preserves the
+original planned item counts across temporary locks and concurrent bag changes,
+and final refreshed contents are checked against confirmed destinations.
+Incomplete runs can be checked again with `/gbo verify` without moving items.
+See [maintenance validation](MAINTENANCE_VALIDATION.md) for evidence and limits.
+
 ### Later expansion
 
 - Item-specific exclusion rules.

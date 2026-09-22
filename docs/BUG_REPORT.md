@@ -17,3 +17,8 @@ If an item appears to be in the wrong location, close and reopen the guild bank
 before reporting it. The server can update guild-bank slots after the local UI.
 Do not begin moving more items until the cursor is empty and the bank has
 settled.
+
+In the maintenance candidate, Copy Report works before any run and appends current
+profiles and quarantined recovery data. Review that appendix before sharing.
+For an incomplete refresh, `/gbo verify` performs a read-only current-session
+recheck and retains the original result; include both in the report.

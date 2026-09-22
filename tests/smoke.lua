@@ -123,7 +123,7 @@ end
 
 local function finishDepositPlanScan()
     local attempts = 0
-    while addon:IsDepositScanning() do
+    while addon:IsDepositScanning() or addon:IsDepositPreviewPending() do
         runNextTimer()
         attempts = attempts + 1
         assert(attempts < 100, "deposit plan scan did not converge")
@@ -615,18 +615,11 @@ local function loadAddonFile(path)
     return chunk(addonName, addon)
 end
 
-loadAddonFile("GuildBankOrganizer/Core.lua")
-loadAddonFile("GuildBankOrganizer/ExpansionData.lua")
-loadAddonFile("GuildBankOrganizer/ProfessionData.lua")
-loadAddonFile("GuildBankOrganizer/Categories.lua")
-loadAddonFile("GuildBankOrganizer/ProfileStore.lua")
-loadAddonFile("GuildBankOrganizer/CategoryReference.lua")
-loadAddonFile("GuildBankOrganizer/Scanner.lua")
-loadAddonFile("GuildBankOrganizer/Diagnostics.lua")
-loadAddonFile("GuildBankOrganizer/Sorter.lua")
-loadAddonFile("GuildBankOrganizer/Depositor.lua")
-loadAddonFile("GuildBankOrganizer/UI.lua")
-loadAddonFile("GuildBankOrganizer/Commands.lua")
+for entry in io.lines("GuildBankOrganizer/GuildBankOrganizer.toc") do
+    if string.match(entry, "%.lua$") then
+        loadAddonFile("GuildBankOrganizer/" .. entry)
+    end
+end
 
 assert(type(addon.ShowTestUI) == "function")
 local categorySections = addon:GetCategoryReferenceSections()
@@ -1309,7 +1302,7 @@ assert(addon:SaveDepositProfileDraft(1, {
     exactItemIDs = { [3371] = true },
 }))
 finishDepositPlanScan()
-while addon:IsDepositScanning() do
+while addon:IsDepositScanning() or addon:IsDepositPreviewPending() do
     runNextTimer()
 end
 GuildBankOrganizerAdvancedFrame.AutoButton.scripts.OnClick()
@@ -1357,7 +1350,10 @@ GuildBankOrganizerReportFrame:Hide()
 -- Stopping after the first (odd) move should perform a conservative corrective
 -- move, leave the item home, and record the run as a failure rather than a pass.
 assert(addon:StartDiagnostic(1, 1, 2, 5.00, 2))
-runNextTimer()
+for _ = 1, 30 do
+    if slots[1][1] == nil and slots[1][2] then break end
+    runNextTimer()
+end
 assert(slots[1][1] == nil and slots[1][2])
 addon:AbortDiagnostic("smoke stop")
 runTimers()
@@ -1934,6 +1930,7 @@ bags[0][2] = nil
 assert(addon:RefreshDepositPlan())
 organizer:Hide()
 runTimers()
+organizer:Show()
 addon:RefreshOrganizerUI()
 assert(not organizer.DepositCurrentButton:IsEnabled())
 assert(organizer.DepositAllButton:IsEnabled())
@@ -2124,6 +2121,7 @@ finishDepositPlanScan()
 GuildBankOrganizerDepositSettingsFrame.LabelInput:SetText("Automatic tab flush")
 currentGuildBankTab = 1
 fire("GUILDBANK_UPDATE_TABS")
+runNextTimer() -- coalesced UI refresh on the next tick
 assert(addon:GetDepositProfile(2, false).label == "Automatic tab flush")
 assert(GuildBankOrganizerDepositSettingsFrame.TabInput:GetText() == "1")
 local profileBeforeBankClose = addon:GetDepositProfile(1, false)

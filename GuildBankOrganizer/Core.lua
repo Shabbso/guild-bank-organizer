@@ -17,9 +17,7 @@ GBO.defaults = {
     sortMaxMoves = 500,
     depositPollInterval = 0.05,
     depositQuietPeriod = 0.15,
-    depositRetryDelay = 0.75,
     depositMaxRetries = 1,
-    depositPlanTabDelay = 0.35,
     depositFinalDelay = 0.50,
     depositMaxMoves = 500,
 }

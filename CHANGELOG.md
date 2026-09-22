@@ -1,5 +1,30 @@
 # Changelog
 
+## 1.2.1-beta.1 — maintenance candidate (2026-09-22)
+
+- Prevent Smart Deposit retries after Stop. Track originally intended items and
+  report partial completion when remaining items become locked or change.
+- Serialize and pace refreshes; require event activity and stable snapshots.
+  Missing refreshes no longer produce cached-state success. Add read-only
+  **Check Again** / `/gbo verify`, preserving the original run report.
+- Guard diagnostics and corrective moves against combat, tab changes, cursor
+  contents, and lost permissions. Cancel stale scan callbacks by request/phase.
+- Debounce editable profile previews; skip scans for unchanged/label-only saves.
+- Make recovery/configuration reports available without a previous operation.
+- Split UI modules and use coalesced events plus a timer only during active work.
+- Defer reference record allocation until first use, preserving every catalog
+  record and category. Clarify that armor kits use Enchanting classification.
+- Make sorting comparisons consistent for variants and check full item links.
+  Refresh the full move-count estimate every eight confirmed moves while still
+  taking a fresh snapshot before every actual move.
+- Add Lua 5.1 regression simulations, catalog parity/provenance checks, CI, and
+  deterministic ZIP packaging with SHA-256 manifests.
+
+This candidate has not completed live MoP guild-bank acceptance. Move cadences
+are unchanged. Slot events remain untagged; refreshed state is not an independent
+server acknowledgement. The catalog still uses build 5.5.4.68806.
+
+
 ## 1.2.0 - 2026-08-13
 
 This release substantially expands Smart Deposit while preserving the

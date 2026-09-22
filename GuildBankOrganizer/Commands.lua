@@ -87,10 +87,7 @@ function GBO:ShowReport()
     if not report and self.db and self.db.runs and self.db.runs[1] then
         report = self.db.runs[1].report
     end
-    if not report then
-        self:Print("No operation report is available yet.")
-        return
-    end
+    report = self:ReportWithCurrentConfiguration(report)
 
     reportFrame = reportFrame or createReportFrame()
     self:HideOrganizerUI()
@@ -112,7 +109,8 @@ function GBO:PrintHelp()
     self:Print("  Source must contain an item; destination must be empty; moves must be even.")
     self:Print("/gbo status - show current operation status")
     self:Print("/gbo stop - stop the current sort, scan, or diagnostic")
-    self:Print("/gbo report - open the latest copyable operation timeline")
+    self:Print("/gbo report - copy the latest timeline and current profile recovery details")
+    self:Print("/gbo verify - check the latest result again without moving items")
 end
 
 function GBO:HandleSlash(message)
@@ -136,7 +134,9 @@ function GBO:HandleSlash(message)
     elseif command == "test" then
         self:StartDiagnostic(args[2], args[3], args[4], args[5], args[6])
     elseif command == "status" then
-        if self.IsSortRunning and self:IsSortRunning() then
+        if self:IsVerificationRunning() then
+            self:Print("Checking the latest result without moving items.")
+        elseif self.IsSortRunning and self:IsSortRunning() then
             self:Print(self:GetSortStatus())
         elseif self.IsDepositRunning and
             (self:IsDepositRunning() or self:IsDepositScanning())
@@ -148,7 +148,9 @@ function GBO:HandleSlash(message)
             self:Print(self:GetDiagnosticStatus())
         end
     elseif command == "stop" then
-        if self.IsSortRunning and self:IsSortRunning() then
+        if self:IsVerificationRunning() then
+            self:AbortVerification()
+        elseif self.IsSortRunning and self:IsSortRunning() then
             self:AbortSort("stopped by user")
         elseif self.IsDepositRunning and
             (self:IsDepositRunning() or self:IsDepositScanning())
@@ -161,6 +163,8 @@ function GBO:HandleSlash(message)
         else
             self:Print("Nothing is running.")
         end
+    elseif command == "verify" then
+        self:CheckAgain()
     elseif command == "report" then
         self:ShowReport()
     else

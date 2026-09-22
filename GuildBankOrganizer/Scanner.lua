@@ -7,6 +7,7 @@ local scan = {
 
 local function resetScan()
     scan.active = false
+    if GBO.RequestUIRefresh then GBO:RequestUIRefresh() end
     scan.waiting = false
     scan.tabs = nil
     scan.position = nil
@@ -108,17 +109,20 @@ function GBO:QueryNextScanTab()
     end
 
     scan.waiting = true
-    local generation = scan.generation
-    QueryGuildBankTab(tab)
-
-    C_Timer.After(self.defaults.scanQueryTimeout, function()
-        if scan.active and scan.waiting and scan.generation == generation then
-            readCurrentTab("timeout")
-        end
+    local started, reason = self:ReadBankTab(scan, tab, function(ok, errorMessage)
+        if ok then readCurrentTab("refresh")
+        else GBO:CancelScan(errorMessage) end
     end)
+    if not started then self:CancelScan(reason) end
 end
 
 function GBO:StartScan(callback)
+    if self:IsVerificationRunning() then
+        self:Print("Finish or stop Check Again first.")
+        return false
+    end
+    self:CancelDepositPreview()
+    self.verificationRequest = nil
     if scan.active then
         self:Print("A guild-bank scan is already running.")
         return false
@@ -155,6 +159,7 @@ function GBO:StartScan(callback)
 
     scan.generation = scan.generation + 1
     scan.active = true
+    if GBO.RequestUIRefresh then GBO:RequestUIRefresh() end
     scan.waiting = false
     scan.tabs = tabs
     scan.position = 1
@@ -174,6 +179,7 @@ function GBO:CancelScan(reason)
     if not scan.active then
         return
     end
+    GBO:CancelBankRead(scan)
     scan.generation = scan.generation + 1
     resetScan()
     self:Print("Scan stopped: " .. tostring(reason or "cancelled"))
@@ -182,14 +188,3 @@ end
 function GBO:IsScanRunning()
     return scan.active
 end
-
-GBO:On("GUILDBANKBAGSLOTS_CHANGED", function()
-    if scan.active and scan.waiting then
-        local generation = scan.generation
-        C_Timer.After(0, function()
-            if scan.active and scan.waiting and scan.generation == generation then
-                readCurrentTab("event")
-            end
-        end)
-    end
-end)
