@@ -1,7 +1,7 @@
 # Guild Bank Organizer
 
-One-button, rate-limited guild-bank sorting for World of Warcraft: Mists of
-Pandaria Classic.
+Guild-bank sorting and profile-based Smart Deposit for World of Warcraft:
+Mists of Pandaria Classic.
 
 Guild Bank Organizer stacks, compacts, and sorts the currently selected
 guild-bank tab through a small panel that opens beside the bank. It has no
@@ -44,7 +44,7 @@ The installed layout should be:
 Interface/AddOns/GuildBankOrganizer/GuildBankOrganizer.toc
 ```
 
-Restart the game or run `/reload`.
+Fully restart World of Warcraft after updating so newly added addon files load.
 
 ## Usage
 
@@ -62,8 +62,9 @@ work before the first move and shows:
 - an approximate time remaining;
 - the active preparation, sorting, or verification phase.
 
-The plan and ETA are refined after every confirmed move. They can adjust if
-stack consolidation or fresh server state changes the remaining work.
+The next move is planned from a fresh snapshot after every confirmation. The
+full move-count estimate is recalculated periodically; the ETA remains approximate
+when other players change the tab.
 
 ### Smart Deposit
 
@@ -83,9 +84,10 @@ leaves the field. The editor also saves before **Scan Bags Now**, **Load Tab**,
 optional explicit confirmation and uses the same validation. Invalid edits stay
 visible with an explanation and never replace the last valid saved profile.
 Exact item IDs must be positive whole numbers separated by commas, whitespace,
-or both. Profile controls are temporarily locked during an active Smart Deposit
-scan or move queue so its routing cannot change in flight; editing becomes
-available again when the operation finishes or is stopped. Saved profiles are
+or both. Profile controls remain editable during the automatic, debounced preview after a
+routing change. Unchanged saves and label-only changes do not rescan the bank.
+Controls lock during an explicitly requested scan or deposit preflight/queue so
+routing cannot change in flight; Stop unlocks them again. Saved profiles are
 stored per guild and survive logout and `/reload`.
 
 Each purchased tab can have its own profile, and each profile can accept
@@ -113,8 +115,23 @@ Deposits use a separate confirmation-driven queue and are not held to the
 1.25-second intra-bank sorting cadence. The queue waits 150 ms after each
 confirmed deposit before issuing another command. If the server silently
 rejects one command, the addon refreshes both endpoints and retries once only
-when the bag source and bank destination are provably unchanged. Nothing moves
+when the refreshed bank destination and observed bag source remain unchanged.
+Stop prevents that retry. The run tracks its original intended items: blocked or
+changed sources remain unresolved rather than disappearing from the completion
+count, and newly arriving bag items wait for a later run. Nothing moves
 until the player clicks one of the two explicit deposit actions.
+
+When the bank opens, Smart Deposit immediately shows **Scanning bags** and then
+its destination progress. It queries only tabs relevant to the items in your bags.
+**Deposit This Tab** prepares only its chosen destination. A verified preview from
+the last 15 seconds can be reused when the bank state is unchanged, so clicking
+Deposit need not repeat that scan. An expired preview, bank event, changed/locked
+contents, newly required destination or competing read requires preparation again.
+Final verification still refreshes every destination that received deposits.
+
+Moving a planned stack in your bags stops the queue with a visible explanation;
+an already issued deposit can settle first. Temporary locks instead show a waiting
+state. A background preview does not overwrite the stop reason.
 
 Category rules are based on the client item class, subclass, equipment slot,
 profession recipe graph, specialized-bag metadata, source-backed item era, or
@@ -146,8 +163,9 @@ If a scan finds no deposits, the setup status explains whether the profile is
 paused, an expansion filter excluded matching items, matching items are bound
 or locked, a material lacks a supported category rule, or the destination tab
 lacks usable space or deposit access.
-Temporarily locked items are rescanned for up to three seconds and the compact
-plan refreshes automatically when WoW reports that an item unlocked.
+The preview refreshes when WoW reports an item unlock. During a deposit run,
+originally planned items that become unavailable receive a bounded five-second
+wait; a persistent problem reports partial completion.
 
 Click **Settings** for:
 
@@ -160,7 +178,11 @@ Click **Settings** for:
 - copyable operation reports.
 
 If sorting stops, open **Advanced**, click **Copy Report**, then use Ctrl+A and
-Ctrl+C to copy the timeline into a bug report.
+Ctrl+C to copy the timeline into a bug report. Copy Report also works before any
+run and appends current profiles and quarantined recovery data. **Check Again**
+(or `/gbo verify`) refreshes and checks the last operation without moving items;
+it keeps the original report and never retries the operation. It is available
+for runs from the current login session.
 
 ## Slash commands
 
@@ -174,9 +196,18 @@ Ctrl+C to copy the timeline into a bug report.
 - `/gbo status`
 - `/gbo stop`
 - `/gbo report`
+- `/gbo verify`
 - `/gbo help`
 
 ## Safety model
+
+Refreshes are serialized and paced at least 0.5 seconds apart. Completion requires
+post-query slot activity and two stable, unlocked snapshots from sequential
+queries. A missing response reports verification incomplete instead of treating
+cached contents as success. WoW's slot event has no request/tab identifier: this
+is conservative client-observable evidence, **not an independent server receipt**.
+Repeated unrelated events remain an API limitation; avoid concurrent bank edits.
+
 
 Guild-bank operations are server-authoritative and rate-limited. The addon:
 
@@ -192,7 +223,9 @@ Do not manually interact with the guild bank while an operation is running.
 
 - World of Warcraft: Mists of Pandaria Classic
 - Interface: `50504`
-- Tested client: `5.5.4`
+- Release: `1.2.1`
+- Client: `5.5.4`; author reports successful in-game use of the promoted beta.2 build
+- Automated validation and remaining native test limits: [validation notes](docs/MAINTENANCE_VALIDATION.md)
 
 The project currently targets MoP Classic only. Retail, Classic Era, Cataclysm
 Classic, and other clients should not be marked compatible without separate
@@ -216,19 +249,33 @@ written permission. See [`LICENSE`](LICENSE) for the complete terms.
 
 ## Development
 
-Run the off-client Lua parser and mocked WoW lifecycle test from the repository
-root:
+Run the Lua 5.1 simulations, generator tests, and deterministic catalog checks:
 
 ```sh
-for file in GuildBankOrganizer/*.lua tests/*.lua; do
-  npx --yes luaparse "$file" >/dev/null
-done
-npx --yes --package=fengari-node-cli fengari tests/smoke.lua
-python3 scripts/generate_profession_data.py
-```
-
-Build a release:
-
-```sh
+python3 -m venv .venv
+.venv/bin/python -m pip install -r requirements-test.txt
+.venv/bin/python scripts/test.py
+.venv/bin/python -m unittest discover -s tests -p 'test_*.py'
+.venv/bin/python scripts/check_catalog.py
+.venv/bin/python scripts/benchmark_catalog.py
 ./scripts/package.sh
 ```
+
+CI runs these correctness checks and validates the ZIP/manifest; it does not
+publish releases. Packaging fixes ZIP metadata and includes a per-file SHA-256
+manifest plus an external archive checksum.
+
+The pinned generated catalog is retained in `scripts/data/profession-catalog.lua.gz`.
+Routing uses small maps in `ProfessionData.lua`. `ProfessionReference.lua` retains
+compact text at login and decodes records on first reference use. Every published
+record and routing lookup is compared against the pinned snapshot in tests.
+
+`python3 scripts/generate_profession_data.py --source-dir /path/to/csvs` rebuilds
+both modules, the source snapshot, provenance hashes, and the coverage report.
+Omitting `--source-dir` downloads the pinned build from Wago Tools. The inherited
+v1.2.0 snapshot has no original CSV hashes; this maintenance pass preserves its
+contents and does not claim a fresh DB2 audit.
+
+See [maintenance validation](docs/MAINTENANCE_VALIDATION.md),
+[architecture decision](docs/adr/0001-operation-refresh-and-reference-loading.md),
+and [release checklist](docs/RELEASE_CHECKLIST.md).

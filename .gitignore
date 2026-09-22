@@ -4,3 +4,7 @@ dist/
 *.tmp
 .superpowers/
 .worktrees/
+
+__pycache__/
+*.pyc
+.venv/

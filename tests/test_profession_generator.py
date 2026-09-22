@@ -6,6 +6,7 @@ from scripts.generate_profession_data import (
     apply_taxonomy_policy,
     intrinsic_category,
     render_lua,
+    render_combined_lua,
 )
 from scripts.profession_taxonomy import (
     CURATED_CATEGORY_BY_ITEM,
@@ -137,7 +138,7 @@ class TaxonomyPolicyTests(unittest.TestCase):
         self.assertIn('for index = #results, limit + 1, -1 do', lua)
 
     def test_lua_lookup_tables_encode_public_and_excluded_records(self):
-        lua = render_lua({
+        lua = render_combined_lua({
             "generated": {52078: GeneratedCategory(
                 "profession_supplies",
                 "curated shared crafting reagent",

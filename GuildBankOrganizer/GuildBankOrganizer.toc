@@ -2,20 +2,28 @@
 ## Title: Guild Bank Organizer
 ## Notes: Rate-limited guild bank sorting and profile-based Smart Deposits for Mists of Pandaria Classic.
 ## Author: Eric Beane
-## Version: 1.2.0
+## Version: 1.2.1
 ## IconTexture: Interface\AddOns\GuildBankOrganizer\Media\Icon
 ## Category-enUS: Bags & Inventory
 ## SavedVariables: GuildBankOrganizerDB
 
 Core.lua
+Operations.lua
 ExpansionData.lua
 ProfessionData.lua
+ProfessionReference.lua
 Categories.lua
 ProfileStore.lua
+Reports.lua
 CategoryReference.lua
 Scanner.lua
 Diagnostics.lua
 Sorter.lua
 Depositor.lua
+UIWidgets.lua
+UIStatus.lua
+UIPanels.lua
+UIReference.lua
+UIProfiles.lua
 UI.lua
 Commands.lua

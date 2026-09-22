@@ -20,27 +20,23 @@ local function now()
 end
 
 local function schedule(delay, callback)
-    local generation = depositor.generation
-    C_Timer.After(delay, function()
-        if depositor.generation == generation then
-            callback()
-        end
-    end)
+    GBO:ScheduleOperation(depositor, delay, callback)
 end
 
 local function addTimeline(message)
-    if not depositor.running then
-        return
-    end
+    GBO:AppendTimeline(depositor, message)
+end
 
-    table.insert(depositor.timeline, string.format(
-        "%8.3f  %s",
-        now() - depositor.startedAt,
-        tostring(message)
-    ))
-    while #depositor.timeline > GBO.defaults.maxTimelineEntries do
-        table.remove(depositor.timeline, 1)
+local function sourceKey(bag, slot)
+    return tostring(bag) .. ":" .. tostring(slot)
+end
+
+local function outstandingItems()
+    local total = 0
+    for _, budget in pairs(depositor.budgets or {}) do
+        total = total + budget.remaining
     end
+    return total
 end
 
 function GBO:HasEnabledDepositProfiles()
@@ -360,7 +356,12 @@ local function readEligibleBagItems(routing)
         local numSlots = getContainerNumSlots and getContainerNumSlots(bag) or 0
         for slot = 1, numSlots do
             local item = readBagSlot(bag, slot)
-            if item and not item.locked and not item.bound and item.link then
+            local budget = depositor.running and depositor.budgets[sourceKey(bag, slot)]
+            local intended = not depositor.running or (budget and budget.remaining > 0
+                and item and item.link == budget.link
+                and item.count == budget.originalCount - budget.completed)
+            if item and intended and not item.locked and not item.bound and item.link then
+                item.depositLimit = budget and budget.remaining or item.count
                 local tab, routeEvidence, conflict =
                     GBO:ResolveDepositRoute(routing, item)
                 if conflict then
@@ -388,6 +389,38 @@ local function readEligibleBagItems(routing)
         return left.slot < right.slot
     end)
     return items, conflicts
+end
+
+local function requiredDepositTabs(scopeTab)
+    local routing = enabledProfileRouting()
+    local sources = readEligibleBagItems(routing)
+    local seen, tabs = {}, {}
+    for _, source in ipairs(sources) do
+        local tab = source.targetTab
+        local _, _, view, deposit = GetGuildBankTabInfo(tab)
+        if (not scopeTab or tab == scopeTab) and view and deposit and not seen[tab] then
+            seen[tab] = true
+            tabs[#tabs + 1] = tab
+        end
+    end
+    table.sort(tabs)
+    return tabs
+end
+
+-- Reuse only a recently verified tab in this bank session. Any subsequent bank
+-- event invalidates the certificate; live signatures and move guards still apply.
+local function canReuseDepositPreview(scopeTab)
+    local certificate = depositor.previewVerification
+    if GBO:IsBankReadPending() or not certificate
+        or certificate.revision ~= GBO:GetBankActivityRevision() then return false end
+    for _, tab in ipairs(requiredDepositTabs(scopeTab)) do
+        local checked = certificate.tabs[tab]
+        if not checked or not checked.signature
+            or now() - checked.at > GBO.defaults.depositPreviewMaxAge
+            or checked.signature ~= GBO:GetBankTabSignature(tab)
+        then return false end
+    end
+    return true
 end
 
 local function cloneBankSlots(tab)
@@ -455,7 +488,7 @@ local function planTab(profile, tab, sources)
     local bankSlots, emptySlots = cloneBankSlots(tab)
     local emptyPosition = 1
     for _, source in ipairs(sources) do
-        local remaining = source.count
+        local remaining = math.min(source.count, source.depositLimit or source.count)
         local sourceCount = source.count
         local plannedForSource = false
 
@@ -594,6 +627,37 @@ local function filterDepositPlan(plan, selectedTabs)
     return filtered
 end
 
+function GBO:GetDepositNotice() return depositor.notice end
+
+function GBO:GetDepositScanProgress()
+    if depositor.scanning then
+        local total = #depositor.scanTabs
+        local completed = math.min(total, depositor.scanPosition - 1)
+        return {total = total, completed = completed, tab = depositor.scanTabs[depositor.scanPosition],
+            message = depositor.preview and "Scanning bags and destinations..." or "Preparing deposits...",
+            detail = string.format("Checking destination %d of %d (bank tab %s)",
+                math.min(completed + 1, total), total, tostring(depositor.scanTabs[depositor.scanPosition] or "?"))}
+    elseif depositor.previewQueued then
+        return {total = 0, completed = 0, message = "Scanning bags...", detail = "Finding items to deposit..."}
+    end
+end
+
+function GBO:IsDepositPreviewPending()
+    return depositor.previewQueued or (depositor.scanning and depositor.preview)
+end
+
+function GBO:CancelDepositPreview(owner)
+    if owner == depositor then return end
+    depositor.notice = nil
+    depositor.idleRefreshGeneration = depositor.idleRefreshGeneration + 1
+    depositor.previewQueued = false
+    if depositor.scanning and depositor.preview then
+        self:CancelBankRead(depositor)
+        depositor.scanning = false
+        depositor.generation = depositor.generation + 1
+    end
+end
+
 function GBO:GetDepositPlan()
     return depositor.plan
 end
@@ -658,12 +722,27 @@ function GBO:GetDepositPlanSummary()
     )
 end
 
+local queryNextPlanTab
+
 local function finishPlanRefresh(generation)
     if depositor.generation ~= generation or not depositor.scanning then
         return
     end
+    -- A bag change during preflight may introduce another destination. Include
+    -- it before handing a ready plan to the execution callback.
+    for _, tab in ipairs(requiredDepositTabs(depositor.scanScope)) do
+        if not depositor.scanChecked[tab] then
+            depositor.scanTabs[#depositor.scanTabs + 1] = tab
+        end
+    end
+    if depositor.scanTabs[depositor.scanPosition] then
+        queryNextPlanTab(generation)
+        return
+    end
     depositor.scanning = false
+    depositor.previewVerification = {revision = GBO:GetBankActivityRevision(), tabs = depositor.scanChecked}
     depositor.plan = buildDepositPlan()
+    if GBO.RequestUIRefresh then GBO:RequestUIRefresh() end
     local callback = depositor.scanCallback
     depositor.scanCallback = nil
     if callback then
@@ -671,7 +750,7 @@ local function finishPlanRefresh(generation)
     end
 end
 
-local function queryNextPlanTab(generation)
+queryNextPlanTab = function(generation)
     if depositor.generation ~= generation or not depositor.scanning then
         return
     end
@@ -686,48 +765,58 @@ local function queryNextPlanTab(generation)
         return
     end
 
-    QueryGuildBankTab(tab)
-    depositor.scanPosition = depositor.scanPosition + 1
-    C_Timer.After(GBO.defaults.depositPlanTabDelay, function()
+    if GBO.RequestUIRefresh then GBO:RequestUIRefresh() end
+    local started, reason = GBO:ReadBankTab(depositor, tab, function(ok, errorMessage)
+        if depositor.generation ~= generation or not depositor.scanning then return end
+        if not ok then
+            depositor.scanning = false
+            depositor.scanCallback = nil
+            depositor.notice = errorMessage
+            GBO.lastOutcome = { ok = false, type = "deposit", reason = errorMessage }
+            GBO:Print(errorMessage)
+            if GBO.RequestUIRefresh then GBO:RequestUIRefresh() end
+            return
+        end
+        depositor.scanChecked[tab] = {at = now(), signature = GBO:GetBankTabSignature(tab)}
+        depositor.scanPosition = depositor.scanPosition + 1
         queryNextPlanTab(generation)
     end)
+    if not started then
+        depositor.scanning = false
+        depositor.scanCallback = nil
+        depositor.notice = reason
+        if GBO.RequestUIRefresh then GBO:RequestUIRefresh() end
+        GBO:Print(reason)
+    end
 end
 
-function GBO:RefreshDepositPlan(callback)
+function GBO:RefreshDepositPlan(callback, editablePreview, scopeTab)
     if depositor.running or not self:IsBankOpen() then
         return false
     end
-    if self:IsDiagnosticRunning()
+    if self:IsVerificationRunning() or self:IsDiagnosticRunning()
         or self:IsScanRunning()
         or (self.IsSortRunning and self:IsSortRunning())
     then
         return false
     end
 
+    self:CancelBankRead(depositor)
+    depositor.previewVerification = nil
+    depositor.previewQueued = false
+    if not editablePreview then depositor.notice = nil end
+    depositor.preview = editablePreview and true or false
     depositor.generation = depositor.generation + 1
     local generation = depositor.generation
     depositor.plan = nil
     depositor.scanCallback = callback
-    depositor.scanTabs = {}
+    depositor.scanScope = tonumber(scopeTab)
+    depositor.scanTabs = requiredDepositTabs(depositor.scanScope)
     depositor.scanPosition = 1
-
-    local _, profiles = enabledProfileRouting()
-    for tab = 1, GetNumGuildBankTabs() do
-        if profiles[tab] then
-            table.insert(depositor.scanTabs, tab)
-        end
-    end
-    if #depositor.scanTabs == 0 then
-        depositor.scanning = false
-        depositor.plan = buildDepositPlan()
-        depositor.scanCallback = nil
-        if callback then
-            callback(depositor.plan)
-        end
-        return true
-    end
+    depositor.scanChecked = {}
 
     depositor.scanning = true
+    if GBO.RequestUIRefresh then GBO:RequestUIRefresh() end
     queryNextPlanTab(generation)
     return true
 end
@@ -766,6 +855,10 @@ local function buildReport(ok, reason)
             depositor.averageSeconds or 0,
             depositor.skippedItems or 0
         ),
+        string.format("preflightSeconds=%.3f preflightTabs=%d reusedPreview=%s",
+            depositor.preflightSeconds or 0, depositor.preflightTabCount or 0, tostring(depositor.reusedPreview or false)),
+        string.format("intendedItems=%d unresolvedItems=%d",
+            depositor.intendedItems or 0, outstandingItems()),
         string.format(
             "routingConflicts=%d firstRoutingConflictItemID=%s firstRoutingConflictTabs=%s",
             #routingConflicts,
@@ -795,6 +888,8 @@ local function buildReport(ok, reason)
         confirmedMoves = depositor.confirmed,
         retries = depositor.retries or 0,
         depositedItems = depositor.depositedItems,
+        intendedItems = depositor.intendedItems,
+        unresolvedItems = outstandingItems(),
         averageMoveSeconds = depositor.averageSeconds,
         skippedItems = depositor.skippedItems,
         routingConflictCount = #routingConflicts,
@@ -803,15 +898,50 @@ local function buildReport(ok, reason)
     }
 end
 
+local function checkDepositResult()
+    for _, target in pairs(depositor.targets or {}) do
+        local actual = GBO:ReadSlot(target.tab, target.slot)
+        if actual.link ~= target.link or actual.count ~= target.count or actual.locked then
+            return false, "verification incomplete: deposited contents changed during final refresh"
+        end
+    end
+    for _, budget in pairs(depositor.budgets or {}) do
+        if budget.remaining == 0 then
+            local actual = readBagSlot(budget.bag, budget.slot)
+            local count = budget.originalCount - budget.completed
+            if (count == 0 and actual) or (count > 0 and (not actual
+                or actual.link ~= budget.link or actual.count ~= count or actual.locked)) then
+                return false, "verification incomplete: bag contents changed during final refresh"
+            end
+        end
+    end
+    return true
+end
+
 local function finishDeposit(ok, reason)
     if not depositor.running then
         return
     end
     addTimeline(string.format("FINISH %s: %s", ok and "PASS" or "FAIL", reason))
     local report, savedRun = buildReport(ok, reason)
+    GBO:CancelBankRead(depositor)
     depositor.running = false
+    if GBO.RequestUIRefresh then GBO:RequestUIRefresh() end
     depositor.generation = depositor.generation + 1
     depositor.plan = nil
+    depositor.previewVerification = nil
+    depositor.notice = not ok and reason or nil
+    local tabs = {}
+    for tab in pairs(depositor.selectedTabs or {}) do tabs[#tabs + 1] = tab end
+    table.sort(tabs)
+    GBO.verificationRequest = {tabs = tabs, report = report, check = function()
+        local valid, why = checkDepositResult()
+        if not valid then return false, why end
+        if outstandingItems() > 0 or (depositor.skippedItems or 0) > 0 then
+            return false, "intended items remain unresolved; start a new deposit to continue"
+        end
+        return true, "refreshed bank and bag contents match the confirmed deposits"
+    end}
     GBO.lastReport = report
     GBO.lastOutcome = {
         ok = ok,
@@ -826,19 +956,14 @@ local function finishDeposit(ok, reason)
         depositor.depositedItems,
         depositor.confirmed
     ))
-    if GBO:IsBankOpen() then
-        C_Timer.After(0.20, function()
-            if not depositor.running and GBO:IsBankOpen() then
-                GBO:RefreshDepositPlan()
-            end
-        end)
-    end
+    GBO:QueueDepositPreview()
 end
 
 local function expectedBankTarget(move)
     local target = GBO:ReadSlot(move.targetTab, move.targetSlot)
     return target
         and not target.locked
+        and target.link == move.sourceLink
         and target.itemID == move.sourceItemID
         and target.count == move.targetCountBefore + move.amount
 end
@@ -868,6 +993,7 @@ function GBO:RetryUnchangedDeposit()
     local source = readBagSlot(move.sourceBag, move.sourceSlot)
     local expectedSourceCount = move.sourceCountBefore - move.amount
     if sameBagItem(source, move.sourceItemID, expectedSourceCount)
+        and (not source or (not source.locked and source.link == move.sourceLink))
         and expectedBankTarget(move)
     then
         depositor.retryPending = nil
@@ -887,6 +1013,10 @@ function GBO:RetryUnchangedDeposit()
         return
     end
 
+    if depositor.stopRequested then
+        finishDeposit(false, "stopped by user; unconfirmed deposit was not retried")
+        return
+    end
     move.retryCount = (move.retryCount or 0) + 1
     depositor.retries = depositor.retries + 1
     depositor.retryPending = nil
@@ -895,6 +1025,24 @@ function GBO:RetryUnchangedDeposit()
         move.retryCount
     ))
     self:IssueDepositMove(move, true)
+end
+
+local function changedPlannedSource(activeMove)
+    local activeKey = activeMove and sourceKey(activeMove.sourceBag, activeMove.sourceSlot)
+    for key, budget in pairs(depositor.budgets or {}) do
+        if budget.remaining > 0 and key ~= activeKey then
+            local source = readBagSlot(budget.bag, budget.slot)
+            if not source or (not source.locked and (source.link ~= budget.link
+                or source.count ~= budget.originalCount - budget.completed or source.bound)) then
+                return true
+            end
+        end
+    end
+    return false
+end
+
+local function changedBagsReason()
+    return "bag contents changed; scan again to continue"
 end
 
 function GBO:CheckDepositMove()
@@ -912,14 +1060,28 @@ function GBO:CheckDepositMove()
     end
 
     local move = depositor.move
+    if changedPlannedSource(move) then
+        depositor.stopRequested = true
+        depositor.stopReason = changedBagsReason()
+        if self.RequestUIRefresh then self:RequestUIRefresh() end
+    end
     local source = readBagSlot(move.sourceBag, move.sourceSlot)
     local expectedSourceCount = move.sourceCountBefore - move.amount
     if sameBagItem(source, move.sourceItemID, expectedSourceCount)
+        and (not source or (not source.locked and source.link == move.sourceLink))
         and expectedBankTarget(move)
     then
         local elapsed = math.max(0, now() - depositor.moveIssuedAt)
         depositor.confirmed = depositor.confirmed + 1
         depositor.depositedItems = depositor.depositedItems + move.amount
+        local budget = depositor.budgets[sourceKey(move.sourceBag, move.sourceSlot)]
+        depositor.blockedSince = nil
+        budget.completed = budget.completed + move.amount
+        budget.remaining = budget.remaining - move.amount
+        depositor.targets[tostring(move.targetTab) .. ":" .. tostring(move.targetSlot)] = {
+            tab = move.targetTab, slot = move.targetSlot, link = move.sourceLink,
+            count = move.targetCountBefore + move.amount,
+        }
         depositor.totalSeconds = depositor.totalSeconds + elapsed
         depositor.averageSeconds = depositor.totalSeconds / depositor.confirmed
         addTimeline(string.format(
@@ -936,7 +1098,7 @@ function GBO:CheckDepositMove()
         depositor.moveIssuedAt = nil
         depositor.retryPending = nil
         if depositor.stopRequested then
-            finishDeposit(false, "stopped by user after the active deposit settled")
+            finishDeposit(false, depositor.stopReason or "stopped by user after the active deposit settled")
         else
             depositor.stage = "planning"
             schedule(self.defaults.depositQuietPeriod, function()
@@ -951,16 +1113,22 @@ function GBO:CheckDepositMove()
     end
 
     if now() - depositor.moveIssuedAt >= self.defaults.operationTimeout then
+        if depositor.stopRequested then
+            finishDeposit(false, (depositor.stopReason or "stopped by user") .. "; active deposit remains unconfirmed")
+            return
+        end
         if (move.retryCount or 0) < self.defaults.depositMaxRetries then
             depositor.retryPending = true
             addTimeline(string.format(
                 "deposit timed out; refreshing T%d before one unchanged-state retry",
                 move.targetTab
             ))
-            QueryGuildBankTab(move.targetTab)
-            schedule(self.defaults.depositRetryDelay, function()
-                GBO:RetryUnchangedDeposit()
+            local started, reason = self:ReadBankTab(depositor, move.targetTab, function(ok, errorMessage)
+                if not depositor.running then return end
+                if ok then GBO:RetryUnchangedDeposit()
+                else finishDeposit(false, errorMessage) end
             end)
+            if not started then finishDeposit(false, reason) end
             return
         end
         finishDeposit(false, "deposit did not reach its expected bag and bank state")
@@ -975,6 +1143,12 @@ function GBO:IssueDepositMove(move, isRetry)
     if not depositor.running then
         return
     end
+    if depositor.stopRequested then
+        finishDeposit(false, "stopped by user")
+        return
+    end
+    local allowed, reason = self:CheckBankAction(move.targetTab, false, false)
+    if not allowed then finishDeposit(false, reason); return end
     if depositor.issued >= self.defaults.depositMaxMoves then
         finishDeposit(false, "deposit safety limit reached")
         return
@@ -986,7 +1160,9 @@ function GBO:IssueDepositMove(move, isRetry)
 
     local source = readBagSlot(move.sourceBag, move.sourceSlot)
     local target = self:ReadSlot(move.targetTab, move.targetSlot)
-    if not sameBagItem(source, move.sourceItemID, move.sourceCountBefore) then
+    if not sameBagItem(source, move.sourceItemID, move.sourceCountBefore)
+        or source.link ~= move.sourceLink or source.bound
+    then
         finishDeposit(false, "bag contents changed before a planned deposit")
         return
     end
@@ -1056,6 +1232,8 @@ local function finishVerification()
     if not depositor.running or depositor.stage ~= "verifying" then
         return
     end
+    local valid, reason = checkDepositResult()
+    if not valid then finishDeposit(false, reason); return end
     local remaining = selectedPlan()
     if remaining.totalMoves > 0 then
         addTimeline("final refresh found additional deposit work; resuming")
@@ -1063,11 +1241,17 @@ local function finishVerification()
         GBO:PlanNextDeposit()
         return
     end
-    depositor.skippedItems = remaining.skippedItems
-    finishDeposit(true, remaining.skippedItems > 0
-        and "eligible items deposited; some items had no available space"
-        or "all planned items were deposited"
-    )
+    depositor.skippedItems = math.max(depositor.initialSkipped or 0, remaining.skippedItems)
+    local unresolved = outstandingItems()
+    if unresolved > 0 then
+        finishDeposit(false, string.format(
+            "partial completion: %d intended items remain blocked, changed, or unavailable", unresolved))
+    elseif depositor.skippedItems > 0 then
+        finishDeposit(false, string.format(
+            "partial completion: %d items had no space or deposit access", depositor.skippedItems))
+    else
+        finishDeposit(true, "all planned items were deposited; refreshed bank state checked")
+    end
 end
 
 local function queryVerificationTab()
@@ -1079,9 +1263,13 @@ local function queryVerificationTab()
         finishVerification()
         return
     end
-    QueryGuildBankTab(tab)
-    depositor.verifyPosition = depositor.verifyPosition + 1
-    schedule(GBO.defaults.depositPlanTabDelay, queryVerificationTab)
+    local started, reason = GBO:ReadBankTab(depositor, tab, function(ok, errorMessage)
+        if not depositor.running then return end
+        if not ok then finishDeposit(false, errorMessage); return end
+        depositor.verifyPosition = depositor.verifyPosition + 1
+        queryVerificationTab()
+    end)
+    if not started then finishDeposit(false, reason) end
 end
 
 local function settleAndVerify()
@@ -1120,11 +1308,15 @@ function GBO:PlanNextDeposit()
         return
     end
 
+    if changedPlannedSource() then
+        finishDeposit(false, changedBagsReason())
+        return
+    end
     depositor.stage = "planning"
     local plan = selectedPlan()
-    depositor.estimatedTotal = depositor.confirmed + plan.totalMoves
+    depositor.estimatedTotal = math.max(depositor.estimatedTotal or 0, depositor.confirmed + plan.totalMoves)
     depositor.estimatedRemaining = plan.totalMoves
-    depositor.skippedItems = plan.skippedItems
+    depositor.skippedItems = math.max(depositor.initialSkipped or 0, plan.skippedItems)
     for _, tab in ipairs(plan.order) do
         local tabPlan = plan.tabs[tab]
         if tabPlan.operations[1] then
@@ -1132,19 +1324,39 @@ function GBO:PlanNextDeposit()
             return
         end
     end
+    if outstandingItems() > 0 then
+        depositor.blockedSince = depositor.blockedSince or now()
+        if now() - depositor.blockedSince < self.defaults.operationTimeout then
+            depositor.stage = "blocked"
+            if self.RequestUIRefresh then self:RequestUIRefresh() end
+            schedule(0.10, function() GBO:PlanNextDeposit() end)
+            return
+        end
+    end
     settleAndVerify()
 end
 
 function GBO:StartDeposit(tab, refreshed)
+    if self:IsVerificationRunning() then
+        self:Print("Finish or stop Check Again first.")
+        return false
+    end
+    self:CancelDepositPreview()
+    self.verificationRequest = nil
     if depositor.running then
         self:Print("A smart-deposit operation is already running.")
         return false
+    end
+    if depositor.scanning and depositor.preview then
+        self:CancelBankRead(depositor)
+        depositor.generation = depositor.generation + 1
+        depositor.scanning = false
     end
     if depositor.scanning then
         self:Print("Wait for the current Smart Deposit scan to finish.")
         return false
     end
-    if self:IsDiagnosticRunning()
+    if self:IsVerificationRunning() or self:IsDiagnosticRunning()
         or self:IsScanRunning()
         or (self.IsSortRunning and self:IsSortRunning())
     then
@@ -1159,13 +1371,28 @@ function GBO:StartDeposit(tab, refreshed)
         self:Print("Smart Deposit cannot start during combat.")
         return false
     end
+    if tab ~= nil then
+        tab = tonumber(tab)
+        if not tab or tab ~= math.floor(tab) or tab < 1 or tab > GetNumGuildBankTabs() then
+            self:Print("Select a purchased guild-bank tab first.")
+            return false
+        end
+    end
     if not refreshed then
-        self:Print("Refreshing bags and assigned tabs before depositing...")
+        depositor.notice = nil
+        depositor.preflightStartedAt = now()
+        depositor.preflightTabCount = 0
+        depositor.reusedPreview = canReuseDepositPreview(tab)
+        refreshed = depositor.reusedPreview
+    end
+    if not refreshed then
+        self:Print("Checking deposit destinations...")
         return self:RefreshDepositPlan(function()
+            depositor.preflightTabCount = #depositor.scanTabs
             if GBO:IsBankOpen() then
                 GBO:StartDeposit(tab, true)
             end
-        end)
+        end, false, tab)
     end
 
     local plan = buildDepositPlan()
@@ -1195,9 +1422,31 @@ function GBO:StartDeposit(tab, refreshed)
 
     depositor.generation = depositor.generation + 1
     depositor.running = true
+    if GBO.RequestUIRefresh then GBO:RequestUIRefresh() end
+    depositor.preview = false
+    depositor.budgets = {}
+    depositor.targets = {}
+    for _, selectedTab in ipairs(scopedPlan.order) do
+        for _, move in ipairs(scopedPlan.tabs[selectedTab].operations) do
+            local key = sourceKey(move.sourceBag, move.sourceSlot)
+            local budget = depositor.budgets[key]
+            if not budget then
+                budget = { bag = move.sourceBag, slot = move.sourceSlot,
+                    link = move.sourceLink, originalCount = move.sourceCountBefore,
+                    remaining = 0, completed = 0 }
+                depositor.budgets[key] = budget
+            end
+            budget.remaining = budget.remaining + move.amount
+        end
+    end
+    depositor.intendedItems = scopedPlan.totalItems
+    depositor.initialSkipped = scopedPlan.skippedItems
+    depositor.blockedSince = nil
     depositor.scanning = false
     depositor.stage = "planning"
     depositor.startedAt = now()
+    depositor.preflightSeconds = now() - (depositor.preflightStartedAt or now())
+    depositor.notice = nil
     depositor.selectedTabs = selectedTabs
     depositor.estimatedTotal = scopedPlan.totalMoves
     depositor.estimatedRemaining = scopedPlan.totalMoves
@@ -1216,6 +1465,7 @@ function GBO:StartDeposit(tab, refreshed)
     depositor.move = nil
     depositor.retryPending = nil
     depositor.stopRequested = nil
+    depositor.stopReason = nil
     self.lastOutcome = nil
 
     addTimeline(string.format(
@@ -1247,15 +1497,18 @@ end
 
 function GBO:AbortDeposit(reason)
     if depositor.scanning and not depositor.running then
+        self:CancelBankRead(depositor)
         depositor.generation = depositor.generation + 1
         depositor.scanning = false
         depositor.scanCallback = nil
+        if self.RequestUIRefresh then self:RequestUIRefresh() end
         return
     end
     if not depositor.running then
         return
     end
     depositor.stopRequested = true
+    if self.RequestUIRefresh then self:RequestUIRefresh() end
     addTimeline("stop requested: " .. tostring(reason or "cancelled"))
     if depositor.stage ~= "waiting" then
         finishDeposit(false, reason or "stopped by user")
@@ -1267,7 +1520,7 @@ function GBO:IsDepositRunning()
 end
 
 function GBO:IsDepositScanning()
-    return depositor.scanning
+    return depositor.scanning and not depositor.preview
 end
 
 function GBO:GetDepositProgress()
@@ -1283,6 +1536,7 @@ function GBO:GetDepositProgress()
     local eta = remaining * secondsPerMove + self.defaults.depositFinalDelay
     return {
         stage = depositor.stage,
+        stopping = depositor.stopRequested and true or false,
         total = total,
         completed = depositor.confirmed,
         remaining = remaining,
@@ -1295,8 +1549,10 @@ function GBO:GetDepositProgress()
 end
 
 function GBO:GetDepositStatus()
-    if depositor.scanning then
-        return "Scanning bags and assigned tabs..."
+    local scanProgress = self:GetDepositScanProgress()
+    if scanProgress then return scanProgress.message end
+    if depositor.running and depositor.stopRequested then
+        return depositor.stopReason and "Stopping: bag contents changed..." or "Stopping after the active deposit..."
     end
     if not depositor.running then
         return self:GetDepositPlanSummary() or "No smart deposits are currently planned."
@@ -1304,6 +1560,7 @@ function GBO:GetDepositStatus()
     local progress = self:GetDepositProgress()
     local stageNames = {
         planning = "Planning deposits",
+        blocked = "Waiting for items or space",
         waiting = "Depositing",
         settling = "Finalizing deposits",
         verifying = "Verifying deposits",
@@ -1316,19 +1573,36 @@ function GBO:GetDepositStatus()
     )
 end
 
-local function refreshForGuildBank()
-    if GBO:HasEnabledDepositProfiles() then
-        C_Timer.After(0.50, function()
-            if GBO:IsBankOpen() and not depositor.running then
-                GBO:RefreshDepositPlan()
-            end
-        end)
-    else
-        depositor.plan = buildDepositPlan()
+function GBO:QueueDepositPreview()
+    depositor.idleRefreshGeneration = depositor.idleRefreshGeneration + 1
+    local token = depositor.idleRefreshGeneration
+    depositor.previewQueued = true
+    if depositor.scanning and depositor.preview then
+        self:CancelBankRead(depositor)
+        depositor.scanning = false
+        depositor.generation = depositor.generation + 1
     end
+    depositor.plan = nil
+    if self.RequestUIRefresh then self:RequestUIRefresh() end
+    C_Timer.After(0.30, function()
+        if token ~= depositor.idleRefreshGeneration then return end
+        depositor.previewQueued = false
+        if GBO:IsBankOpen()
+            and not depositor.running and not depositor.scanning
+        then GBO:RefreshDepositPlan(nil, true) end
+    end)
+end
+
+local function refreshForGuildBank()
+    depositor.notice = nil
+    depositor.previewVerification = nil
+    GBO:QueueDepositPreview()
 end
 
 local function clearForGuildBank()
+    depositor.notice = nil
+    depositor.previewVerification = nil
+    GBO:CancelDepositPreview()
     if depositor.running or depositor.scanning then
         GBO:AbortDeposit("bank closed")
     end
@@ -1358,41 +1632,15 @@ GBO:On("BAG_UPDATE_DELAYED", function()
                 GBO:CheckDepositMove()
             end)
         end
-    elseif GBO:IsBankOpen() and GBO:HasEnabledDepositProfiles() then
-        depositor.idleRefreshGeneration =
-            depositor.idleRefreshGeneration + 1
-        local refreshGeneration = depositor.idleRefreshGeneration
-        C_Timer.After(0.30, function()
-            if refreshGeneration == depositor.idleRefreshGeneration
-                and not depositor.running
-                and not depositor.scanning
-                and GBO:IsBankOpen()
-            then
-                GBO:RefreshDepositPlan()
-            end
-        end)
+    elseif GBO:IsBankOpen() and GBO:HasEnabledDepositProfiles()
+        and not (depositor.scanning and not depositor.preview) then
+        GBO:QueueDepositPreview()
     end
 end)
 
 GBO:On("ITEM_UNLOCKED", function()
-    if not depositor.running
-        and not depositor.scanning
-        and GBO:IsBankOpen()
-        and GBO:HasEnabledDepositProfiles()
-    then
-        depositor.idleRefreshGeneration =
-            depositor.idleRefreshGeneration + 1
-        local refreshGeneration = depositor.idleRefreshGeneration
-        C_Timer.After(0.10, function()
-            if refreshGeneration == depositor.idleRefreshGeneration
-                and not depositor.running
-                and not depositor.scanning
-                and GBO:IsBankOpen()
-            then
-                GBO:RefreshDepositPlan()
-            end
-        end)
-    end
+    if not depositor.running and not (depositor.scanning and not depositor.preview)
+        and GBO:IsBankOpen() then GBO:QueueDepositPreview() end
 end)
 
 GBO:On("GUILDBANKBAGSLOTS_CHANGED", function()

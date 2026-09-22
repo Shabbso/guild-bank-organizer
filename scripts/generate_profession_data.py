@@ -12,6 +12,9 @@ from __future__ import annotations
 
 import argparse
 import csv
+import gzip
+import hashlib
+import json
 import subprocess
 import tempfile
 from collections import Counter, defaultdict
@@ -550,7 +553,21 @@ def lua_quote(value: str) -> str:
     return '"' + value.replace("\\", "\\\\").replace('"', '\\"') + '"'
 
 
-def render_lua(catalog) -> str:
+try:
+    from scripts.profession_artifacts import split_catalog
+except ModuleNotFoundError:
+    from profession_artifacts import split_catalog
+
+
+def render_lua(catalog):
+    return split_catalog(render_combined_lua(catalog))[0]
+
+
+def render_reference_lua(catalog):
+    return split_catalog(render_combined_lua(catalog))[1]
+
+
+def render_combined_lua(catalog) -> str:
     generated = catalog["generated"]
     reference = catalog["reference"]
     shared_item_ids = [
@@ -840,18 +857,35 @@ def main() -> None:
         type=Path,
         default=project_dir / "docs" / "PROFESSION_COVERAGE.md",
     )
+    parser.add_argument("--reference-output", type=Path,
+        default=project_dir / "GuildBankOrganizer" / "ProfessionReference.lua")
     args = parser.parse_args()
+    def input_hashes(directory):
+        return {f"{table}.csv": hashlib.sha256((directory / f"{table}.csv").read_bytes()).hexdigest()
+                for table in SOURCE_TABLES}
+
 
     if args.source_dir:
         catalog = build_catalog(load_sources(args.source_dir))
+        hashes = input_hashes(args.source_dir)
     else:
         with tempfile.TemporaryDirectory(prefix="gbo-profession-data-") as directory:
             source_dir = Path(directory)
             for table in SOURCE_TABLES:
                 download(table, source_dir / f"{table}.csv")
             catalog = build_catalog(load_sources(source_dir))
+            hashes = input_hashes(source_dir)
 
+    combined = render_combined_lua(catalog).encode("utf-8")
+    snapshot_dir = project_dir / "scripts" / "data"
+    snapshot_dir.mkdir(exist_ok=True)
+    (snapshot_dir / "profession-catalog.lua.gz").write_bytes(gzip.compress(combined, mtime=0))
+    (snapshot_dir / "provenance.json").write_text(json.dumps({
+        "sourceBuild": SOURCE_BUILD, "origin": "generate_profession_data.py",
+        "combinedSha256": hashlib.sha256(combined).hexdigest(), "rawInputHashes": hashes,
+    }, indent=2) + "\n")
     args.lua_output.write_text(render_lua(catalog), encoding="utf-8")
+    args.reference_output.write_text(render_reference_lua(catalog), encoding="utf-8")
     args.report_output.write_text(render_report(catalog), encoding="utf-8")
     print(
         f"wrote {args.lua_output} with {len(catalog['generated'])} generated items; "

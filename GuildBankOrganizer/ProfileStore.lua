@@ -304,6 +304,16 @@ local function findProfileConflict(GBO, tab, candidate, profiles)
     return nil
 end
 
+local function equalValues(a, b)
+    if type(a) ~= type(b) then return false end
+    if type(a) ~= "table" then return a == b end
+    for key, value in pairs(a) do
+        if not equalValues(value, b[key]) then return false end
+    end
+    for key in pairs(b) do if a[key] == nil then return false end end
+    return true
+end
+
 function GBO:SaveDepositProfileDraft(tab, draft)
     if (self.IsDepositRunning and self:IsDepositRunning())
         or (self.IsDepositScanning and self:IsDepositScanning())
@@ -325,10 +335,15 @@ function GBO:SaveDepositProfileDraft(tab, draft)
     end
 
     profiles = self:GetDepositProfiles(true)
+    local previous = profiles[tab]
+    if equalValues(previous, candidate) then return true, previous end
+    local sameRouting = previous and previous.enabled == candidate.enabled
+        and previous.allExpansions == candidate.allExpansions
+        and equalValues(previous.categories, candidate.categories)
+        and equalValues(previous.expansions, candidate.expansions)
+        and equalValues(previous.exactItemIDs, candidate.exactItemIDs)
     profiles[tab] = candidate
-    if self.RefreshDepositPlan then
-        self:RefreshDepositPlan()
-    end
+    if not sameRouting and self.QueueDepositPreview then self:QueueDepositPreview() end
     return true, candidate
 end
 

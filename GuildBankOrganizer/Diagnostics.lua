@@ -10,17 +10,7 @@ local function now()
 end
 
 local function addTimeline(message)
-    if not diagnostic.running then
-        return
-    end
-
-    local elapsed = now() - diagnostic.startedAt
-    local entry = string.format("%8.3f  %s", elapsed, tostring(message))
-    table.insert(diagnostic.timeline, entry)
-
-    while #diagnostic.timeline > GBO.defaults.maxTimelineEntries do
-        table.remove(diagnostic.timeline, 1)
-    end
+    GBO:AppendTimeline(diagnostic, message)
 end
 
 local function snapshotPair()
@@ -44,82 +34,6 @@ local function expectedReady()
     return true, nil, source, target
 end
 
-local function sortedKeys(value)
-    local keys = {}
-    for key in pairs(value) do
-        table.insert(keys, key)
-    end
-    table.sort(keys, function(left, right)
-        local leftText = type(left) .. ":" .. tostring(left)
-        local rightText = type(right) .. ":" .. tostring(right)
-        return leftText < rightText
-    end)
-    return keys
-end
-
-local function quoteRecoveryString(value)
-    local escaped = string.gsub(value, "\\", "\\\\")
-    escaped = string.gsub(escaped, '"', '\\"')
-    escaped = string.gsub(escaped, "\n", "\\n")
-    escaped = string.gsub(escaped, "\r", "\\r")
-    escaped = string.gsub(escaped, "\t", "\\t")
-    escaped = string.gsub(escaped, "%c", function(character)
-        return string.format("\\%03d", string.byte(character))
-    end)
-    return '"' .. escaped .. '"'
-end
-
-local function formatRecoveryValue(value, depth, visited)
-    if type(value) == "string" then
-        return quoteRecoveryString(value)
-    elseif type(value) ~= "table" then
-        return tostring(value)
-    elseif visited[value] then
-        return "<cycle>"
-    elseif depth >= 4 then
-        return "<nested table>"
-    end
-
-    visited[value] = true
-    local fields = {}
-    for _, key in ipairs(sortedKeys(value)) do
-        table.insert(fields, string.format(
-            "[%s]=%s",
-            formatRecoveryValue(key, depth + 1, visited),
-            formatRecoveryValue(value[key], depth + 1, visited)
-        ))
-    end
-    visited[value] = nil
-    return "{" .. table.concat(fields, ",") .. "}"
-end
-
-local function appendProfileRecovery(lines)
-    local recovery = GBO:GetDepositProfileRecovery()
-    if not recovery then
-        return
-    end
-
-    table.insert(lines, "profileRecovery:")
-    for _, guildKey in ipairs(sortedKeys(recovery)) do
-        local guildRecovery = recovery[guildKey]
-        if type(guildRecovery) == "table" then
-            for _, tab in ipairs(sortedKeys(guildRecovery)) do
-                table.insert(lines, string.format(
-                    "guild=%s tab=%s value=%s",
-                    formatRecoveryValue(guildKey, 0, {}),
-                    formatRecoveryValue(tab, 0, {}),
-                    formatRecoveryValue(guildRecovery[tab], 0, {})
-                ))
-            end
-        else
-            table.insert(lines, string.format(
-                "guild=%s value=%s",
-                formatRecoveryValue(guildKey, 0, {}),
-                formatRecoveryValue(guildRecovery, 0, {})
-            ))
-        end
-    end
-end
 
 local function buildReport(ok, reason)
     local client = GBO.client or {}
@@ -159,7 +73,7 @@ local function buildReport(ok, reason)
     for index = 1, #diagnostic.timeline do
         table.insert(lines, diagnostic.timeline[index])
     end
-    appendProfileRecovery(lines)
+    GBO:AppendProfileRecovery(lines)
 
     return table.concat(lines, "\n"), {
         savedAt = GetServerTime(),
@@ -187,8 +101,17 @@ local function finishDiagnostic(ok, reason)
 
     addTimeline(string.format("FINISH %s: %s", ok and "PASS" or "FAIL", tostring(reason)))
     local report, savedRun = buildReport(ok, reason)
+    GBO:CancelBankRead(diagnostic)
     diagnostic.running = false
+    if GBO.RequestUIRefresh then GBO:RequestUIRefresh() end
     diagnostic.generation = diagnostic.generation + 1
+    GBO.verificationRequest = {tabs = {diagnostic.tab}, report = report, check = function()
+        local original, other = snapshotPair()
+        local valid = not original.locked and not other.locked
+            and GBO:MatchesTrackedItem(original, diagnostic.item) and GBO:IsEmpty(other)
+        return valid, valid and "refreshed slots show the original item restored"
+            or "original item restoration remains unresolved"
+    end}
     GBO.lastReport = report
     GBO.lastOutcome = {
         ok = ok,
@@ -214,6 +137,11 @@ local function verifyRestored()
         return
     end
 
+    local allowed, reason = GBO:CheckBankAction(diagnostic.tab, true, true)
+    if not allowed then
+        finishDiagnostic(false, "restoration unresolved: " .. reason)
+        return
+    end
     local original, other = snapshotPair()
     addTimeline("restore check: " .. GBO:DescribeSlot(original) .. " | " .. GBO:DescribeSlot(other))
 
@@ -258,12 +186,11 @@ local function verifyRestored()
                 C_Timer.After(delay, function()
                     if diagnostic.running and diagnostic.generation == generation then
                         diagnostic.restoreBackoffScheduled = false
-                        QueryGuildBankTab(diagnostic.tab)
-                        C_Timer.After(0.5, function()
-                            if diagnostic.running and diagnostic.generation == generation then
-                                verifyRestored()
-                            end
+                        local started, reason = GBO:ReadBankTab(diagnostic, diagnostic.tab, function(ok, errorMessage)
+                            if ok then verifyRestored()
+                            else finishDiagnostic(false, errorMessage) end
                         end)
+                        if not started then finishDiagnostic(false, reason) end
                     end
                 end)
             end
@@ -289,12 +216,11 @@ local function verifyRestored()
         local generation = diagnostic.generation
         C_Timer.After(GBO.defaults.settleDelay, function()
             if diagnostic.running and diagnostic.generation == generation then
-                QueryGuildBankTab(diagnostic.tab)
-                C_Timer.After(0.5, function()
-                    if diagnostic.running and diagnostic.generation == generation then
-                        verifyRestored()
-                    end
+                local started, reason = GBO:ReadBankTab(diagnostic, diagnostic.tab, function(ok, errorMessage)
+                    if ok then verifyRestored()
+                    else finishDiagnostic(false, errorMessage) end
                 end)
+                if not started then finishDiagnostic(false, reason) end
             end
         end)
         return
@@ -309,38 +235,24 @@ local function settleAndVerify()
     end
 
     diagnostic.stage = "settling"
-    addTimeline(string.format("settling for %.1fs before server-truth query", GBO.defaults.settleDelay))
+    addTimeline(string.format("settling for %.1fs before bank refresh", GBO.defaults.settleDelay))
     local generation = diagnostic.generation
     C_Timer.After(GBO.defaults.settleDelay, function()
         if not diagnostic.running or diagnostic.generation ~= generation then
             return
         end
         diagnostic.stage = "refreshing"
-        diagnostic.refreshScheduled = false
-        addTimeline("QueryGuildBankTab for final verification")
-        QueryGuildBankTab(diagnostic.tab)
-
-        C_Timer.After(GBO.defaults.scanQueryTimeout, function()
-            if diagnostic.running
-                and diagnostic.generation == generation
-                and diagnostic.stage == "refreshing"
-                and not diagnostic.refreshScheduled
-            then
-                diagnostic.refreshScheduled = true
-                addTimeline("final query timed out; verifying cached state")
-                verifyRestored()
-            end
+        addTimeline("refreshing final diagnostic state")
+        local started, reason = GBO:ReadBankTab(diagnostic, diagnostic.tab, function(ok, errorMessage)
+            if ok then verifyRestored()
+            else finishDiagnostic(false, errorMessage) end
         end)
+        if not started then finishDiagnostic(false, reason) end
     end)
 end
 
 local function scheduleOperation(delay)
-    local generation = diagnostic.generation
-    C_Timer.After(delay, function()
-        if diagnostic.running and diagnostic.generation == generation then
-            GBO:RunDiagnosticOperation()
-        end
-    end)
+    GBO:ScheduleOperation(diagnostic, delay, function() GBO:RunDiagnosticOperation() end)
 end
 
 function GBO:RunDiagnosticOperation()
@@ -352,6 +264,8 @@ function GBO:RunDiagnosticOperation()
         return
     end
 
+    local allowed, reason = self:CheckBankAction(diagnostic.tab, true, true)
+    if not allowed then finishDiagnostic(false, "diagnostic stopped: " .. reason); return end
     local cursorType = self:GetCursorType()
     if cursorType then
         self:AbortDiagnostic("cursor is holding " .. tostring(cursorType))
@@ -501,6 +415,12 @@ local function preflightAndBegin()
 end
 
 function GBO:StartDiagnostic(tab, sourceSlot, emptySlot, cadence, moves)
+    if self:IsVerificationRunning() then
+        self:Print("Finish or stop Check Again first.")
+        return false
+    end
+    self:CancelDepositPreview()
+    self.verificationRequest = nil
     if diagnostic.running then
         self:Print("A diagnostic is already running. Use /gbo stop first.")
         return false
@@ -523,6 +443,8 @@ function GBO:StartDiagnostic(tab, sourceSlot, emptySlot, cadence, moves)
     end
 
     tab = tonumber(tab)
+    local allowed, reason = self:CheckBankAction(tab, true, true)
+    if not allowed then self:Print(reason); return false end
     sourceSlot = tonumber(sourceSlot)
     emptySlot = tonumber(emptySlot)
     cadence = tonumber(cadence) or self.defaults.cadence
@@ -539,6 +461,7 @@ function GBO:StartDiagnostic(tab, sourceSlot, emptySlot, cadence, moves)
     if not sourceSlot or sourceSlot < 1 or sourceSlot > self.MAX_SLOTS
         or not emptySlot or emptySlot < 1 or emptySlot > self.MAX_SLOTS
         or sourceSlot == emptySlot
+        or sourceSlot ~= math.floor(sourceSlot) or emptySlot ~= math.floor(emptySlot)
     then
         self:Print("Source and destination must be different slot numbers from 1 to 98.")
         return false
@@ -554,6 +477,7 @@ function GBO:StartDiagnostic(tab, sourceSlot, emptySlot, cadence, moves)
 
     diagnostic.generation = diagnostic.generation + 1
     diagnostic.running = true
+    if GBO.RequestUIRefresh then GBO:RequestUIRefresh() end
     self.lastOutcome = nil
     diagnostic.stage = "preflight"
     diagnostic.startedAt = now()
@@ -571,25 +495,17 @@ function GBO:StartDiagnostic(tab, sourceSlot, emptySlot, cadence, moves)
     diagnostic.uiErrors = {}
     diagnostic.timeline = {}
     diagnostic.refreshScheduled = false
-    diagnostic.preflightScheduled = false
     diagnostic.abortReason = nil
     diagnostic.restoreWaitStarted = nil
     diagnostic.restoreNotBefore = nil
     diagnostic.restoreBackoffScheduled = false
 
     addTimeline("diagnostic requested; querying tab before preflight")
-    QueryGuildBankTab(tab)
-    local generation = diagnostic.generation
-    C_Timer.After(self.defaults.scanQueryTimeout, function()
-        if diagnostic.running and diagnostic.generation == generation
-            and diagnostic.stage == "preflight"
-            and not diagnostic.preflightScheduled
-        then
-            diagnostic.preflightScheduled = true
-            addTimeline("preflight query timed out; checking cached state")
-            preflightAndBegin()
-        end
+    local started, reason = self:ReadBankTab(diagnostic, tab, function(ok, errorMessage)
+        if ok then preflightAndBegin()
+        else finishDiagnostic(false, errorMessage) end
     end)
+    if not started then finishDiagnostic(false, reason); return false end
     return true
 end
 
@@ -598,6 +514,7 @@ function GBO:AbortDiagnostic(reason)
         return
     end
 
+    GBO:CancelBankRead(diagnostic)
     reason = reason or "cancelled"
     local cursorType = self:GetCursorType()
     if self:IsBankOpen() and diagnostic.item and not cursorType then
@@ -638,25 +555,7 @@ GBO:On("GUILDBANKBAGSLOTS_CHANGED", function()
     diagnostic.slotEvents = diagnostic.slotEvents + 1
     addTimeline("event GUILDBANKBAGSLOTS_CHANGED")
 
-    if diagnostic.stage == "preflight" and not diagnostic.preflightScheduled then
-        diagnostic.preflightScheduled = true
-        local generation = diagnostic.generation
-        C_Timer.After(0.25, function()
-            if diagnostic.running and diagnostic.generation == generation
-                and diagnostic.stage == "preflight"
-            then
-                preflightAndBegin()
-            end
-        end)
-    elseif diagnostic.stage == "refreshing" and not diagnostic.refreshScheduled then
-        diagnostic.refreshScheduled = true
-        local generation = diagnostic.generation
-        C_Timer.After(0.25, function()
-            if diagnostic.running and diagnostic.generation == generation then
-                verifyRestored()
-            end
-        end)
-    end
+
 end)
 
 GBO:On("GUILDBANK_ITEM_LOCK_CHANGED", function()

@@ -43,18 +43,7 @@ local function now()
 end
 
 local function addTimeline(message)
-    if not sorter.running then
-        return
-    end
-
-    table.insert(sorter.timeline, string.format(
-        "%8.3f  %s",
-        now() - sorter.startedAt,
-        tostring(message)
-    ))
-    while #sorter.timeline > GBO.defaults.maxTimelineEntries do
-        table.remove(sorter.timeline, 1)
-    end
+    GBO:AppendTimeline(sorter, message)
 end
 
 local function primaryLess(left, right)
@@ -77,15 +66,9 @@ local function primaryLess(left, right)
 end
 
 -- This follows the familiar default bag-sort ordering used by ElvUI on Mists:
--- partial stacks of the same item first, then quality, item class/subclass,
+-- quality, item class/subclass,
 -- equipment slot, item level, vendor value, and item name.
 local function defaultSortItemLess(left, right)
-    if left.itemID == right.itemID then
-        if left.count ~= right.count then
-            return left.count < right.count
-        end
-        return left.slot < right.slot
-    end
 
     if left.quality ~= right.quality then
         return left.quality > right.quality
@@ -171,7 +154,7 @@ local function sameIdentity(left, right)
     if not left or not right then
         return left == nil and right == nil
     end
-    return left.itemID == right.itemID and left.count == right.count
+    return left.link == right.link and left.itemID == right.itemID and left.count == right.count
 end
 
 local function sameStackableItem(left, right)
@@ -321,6 +304,7 @@ local function expectedItem(item, count)
     end
     return {
         itemID = item.itemID,
+        link = item.link,
         count = count,
     }
 end
@@ -352,7 +336,7 @@ local function slotMatchesExpected(slot, expected)
     if not expected then
         return GBO:IsEmpty(slot)
     end
-    return slot.itemID == expected.itemID and slot.count == expected.count
+    return slot.link == expected.link and slot.itemID == expected.itemID and slot.count == expected.count
 end
 
 local function buildReport(ok, reason)
@@ -424,8 +408,17 @@ local function finishSort(ok, reason)
 
     addTimeline(string.format("FINISH %s: %s", ok and "PASS" or "FAIL", tostring(reason)))
     local report, savedRun = buildReport(ok, reason)
+    GBO:CancelBankRead(sorter)
     sorter.running = false
+    if GBO.RequestUIRefresh then GBO:RequestUIRefresh() end
     sorter.generation = sorter.generation + 1
+    GBO.verificationRequest = {tabs = {sorter.tab}, report = report, check = function()
+        local snapshot = GBO:ReadSortSnapshot(sorter.tab)
+        local valid = snapshot.locked == 0 and snapshot.missingItemInfo == 0
+            and not GBO:FindStackMove(snapshot) and not GBO:FindOrderMove(snapshot)
+        return valid, valid and "refreshed tab is stacked, compacted, and sorted"
+            or "tab still needs sorting, is locked, or lacks item metadata"
+    end}
     GBO.lastReport = report
     GBO.lastOutcome = {
         ok = ok,
@@ -445,12 +438,7 @@ local function finishSort(ok, reason)
 end
 
 local function schedule(delay, callback)
-    local generation = sorter.generation
-    C_Timer.After(delay, function()
-        if sorter.running and sorter.generation == generation then
-            callback()
-        end
-    end)
+    GBO:ScheduleOperation(sorter, delay, callback)
 end
 
 local function failAfterBackoff(reason)
@@ -467,10 +455,10 @@ local function failAfterBackoff(reason)
     ))
     schedule(GBO.defaults.sortFailureBackoff, function()
         if GBO:IsBankOpen() then
-            QueryGuildBankTab(sorter.tab)
-            schedule(0.5, function()
-                finishSort(false, sorter.failureReason)
+            local started = GBO:ReadBankTab(sorter, sorter.tab, function(_, refreshReason)
+                finishSort(false, sorter.failureReason .. (refreshReason and ("; " .. refreshReason) or ""))
             end)
+            if not started then finishSort(false, sorter.failureReason) end
         else
             finishSort(false, sorter.failureReason)
         end
@@ -554,6 +542,8 @@ function GBO:IssueSortMove(move)
         return
     end
 
+    local allowed, reason = self:CheckBankAction(sorter.tab, true, true)
+    if not allowed then finishSort(false, reason); return end
     local source = self:ReadSlot(sorter.tab, move.source)
     local target = self:ReadSlot(sorter.tab, move.target)
     if source.locked or target.locked then
@@ -622,6 +612,8 @@ local function finalVerify()
         return
     end
 
+    local allowed, reason = GBO:CheckBankAction(sorter.tab, true, true)
+    if not allowed then finishSort(false, reason); return end
     local snapshot = GBO:ReadSortSnapshot(sorter.tab)
     if snapshot.locked > 0 then
         failAfterBackoff("slots remained locked during final verification")
@@ -647,18 +639,14 @@ end
 local function settleAndVerify()
     sorter.stage = "settling"
     sorter.finalizeStartedAt = now()
-    addTimeline(string.format("settling %.1fs before final server-truth query", GBO.defaults.settleDelay))
+    addTimeline(string.format("settling %.1fs before final bank refresh", GBO.defaults.settleDelay))
     schedule(GBO.defaults.settleDelay, function()
         sorter.stage = "verifying"
-        sorter.verifyScheduled = false
-        QueryGuildBankTab(sorter.tab)
-        schedule(GBO.defaults.scanQueryTimeout, function()
-            if sorter.stage == "verifying" and not sorter.verifyScheduled then
-                sorter.verifyScheduled = true
-                addTimeline("final query timed out; checking cached state")
-                finalVerify()
-            end
+        local started, reason = GBO:ReadBankTab(sorter, sorter.tab, function(ok, errorMessage)
+            if ok then finalVerify()
+            else finishSort(false, errorMessage) end
         end)
+        if not started then finishSort(false, reason) end
     end)
 end
 
@@ -701,7 +689,6 @@ function GBO:PlanNextSortMove()
     if snapshot.missingItemInfo > 0 then
         sorter.infoWaitStarted = sorter.infoWaitStarted or now()
         if now() - sorter.infoWaitStarted < self.defaults.operationTimeout then
-            QueryGuildBankTab(sorter.tab)
             schedule(0.25, function()
                 GBO:PlanNextSortMove()
             end)
@@ -712,7 +699,13 @@ function GBO:PlanNextSortMove()
     end
     sorter.infoWaitStarted = nil
 
-    local estimatedRemaining = self:EstimateSortMoves(snapshot)
+    local estimatedRemaining
+    if sorter.estimateAt == nil or sorter.confirmedMoves - sorter.estimateAt >= 8 then
+        estimatedRemaining = self:EstimateSortMoves(snapshot)
+        sorter.estimateAt = sorter.confirmedMoves
+    elseif sorter.estimatedTotal then
+        estimatedRemaining = math.max(0, sorter.estimatedTotal - sorter.confirmedMoves)
+    end
     if estimatedRemaining then
         local priorTotal = sorter.estimatedTotal
         sorter.estimatedRemaining = estimatedRemaining
@@ -803,6 +796,12 @@ local function preflight()
 end
 
 function GBO:StartSort(tab, cadence)
+    if self:IsVerificationRunning() then
+        self:Print("Finish or stop Check Again first.")
+        return false
+    end
+    self:CancelDepositPreview()
+    self.verificationRequest = nil
     if sorter.running then
         self:Print("A guild-bank sort is already running.")
         return false
@@ -829,7 +828,7 @@ function GBO:StartSort(tab, cadence)
         or (self.db and self.db.settings and self.db.settings.sortCadence)
         or self.defaults.cadence
 
-    if not tab or tab < 1 or tab > GetNumGuildBankTabs() then
+    if not tab or tab ~= math.floor(tab) or tab < 1 or tab > GetNumGuildBankTabs() then
         self:Print("Select a purchased guild-bank tab first.")
         return false
     end
@@ -847,6 +846,7 @@ function GBO:StartSort(tab, cadence)
 
     sorter.generation = sorter.generation + 1
     sorter.running = true
+    if GBO.RequestUIRefresh then GBO:RequestUIRefresh() end
     sorter.stage = "preflight"
     sorter.startedAt = now()
     sorter.tab = tab
@@ -858,6 +858,7 @@ function GBO:StartSort(tab, cadence)
     sorter.estimatedRemaining = nil
     sorter.estimatedTotal = nil
     sorter.initialEstimate = nil
+    sorter.estimateAt = nil
     sorter.stacked = 0
     sorter.sorted = 0
     sorter.slotEvents = 0
@@ -871,8 +872,6 @@ function GBO:StartSort(tab, cadence)
     sorter.lockWaitStarted = nil
     sorter.infoWaitStarted = nil
     sorter.stopRequested = nil
-    sorter.preflightScheduled = false
-    sorter.verifyScheduled = false
     self.lastOutcome = nil
 
     addTimeline("sort requested; querying selected tab before preflight")
@@ -881,14 +880,11 @@ function GBO:StartSort(tab, cadence)
         tab,
         cadence
     ))
-    QueryGuildBankTab(tab)
-    schedule(self.defaults.scanQueryTimeout, function()
-        if sorter.stage == "preflight" and not sorter.preflightScheduled then
-            sorter.preflightScheduled = true
-            addTimeline("preflight query timed out; checking cached state")
-            preflight()
-        end
+    local started, reason = self:ReadBankTab(sorter, tab, function(ok, errorMessage)
+        if ok then preflight()
+        else finishSort(false, errorMessage) end
     end)
+    if not started then finishSort(false, reason); return false end
     return true
 end
 
@@ -1003,13 +999,6 @@ GBO:On("GUILDBANKBAGSLOTS_CHANGED", function()
     end
 
     sorter.slotEvents = sorter.slotEvents + 1
-    if sorter.stage == "preflight" and not sorter.preflightScheduled then
-        sorter.preflightScheduled = true
-        schedule(0.25, preflight)
-    elseif sorter.stage == "verifying" and not sorter.verifyScheduled then
-        sorter.verifyScheduled = true
-        schedule(0.25, finalVerify)
-    end
 end)
 
 GBO:On("UI_ERROR_MESSAGE", function(_, errorType, message)

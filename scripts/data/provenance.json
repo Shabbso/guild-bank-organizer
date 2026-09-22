@@ -1,0 +1,7 @@
+{
+  "sourceBuild": "5.5.4.68806",
+  "origin": "v1.2.0 ProfessionData.lua, commit 0f32a4bdd9521c2302a642ec82d41754265c143e",
+  "combinedSha256": "e697401fc10fc9b7fddc55ca1cd6bf502497fd02d2aaae2c1991e1d7db192ff1",
+  "rawInputHashes": null,
+  "note": "Published generated catalog preserved exactly; original CSV inputs unavailable. No new DB2 validation claimed."
+}

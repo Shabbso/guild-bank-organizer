@@ -340,7 +340,7 @@ local categories = {
     {
         key = "leatherworking",
         name = "Leatherworking",
-        description = "Patterns, drums, kits, and other Leatherworking supplies or products. Raw leather and armor stay in their own categories.",
+        description = "Patterns, drums, and Leatherworking supplies or products. Armor kits route as Enchanting enhancements; raw leather and armor stay in their own categories.",
         evidence = "Recipe and generated profession data",
         examples = { "Pattern: Fine Leather Boots", "Pattern: Hillman's Leather Vest" },
         matches = recipeIs(RECIPE.LEATHERWORKING),
